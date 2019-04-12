@@ -34,14 +34,48 @@ CSMA/CD£¨Carrier Sense Multiple Access/Collision Detection£¬¼´ÔØ²¨¶àÖØ·ÃÎÊ/Åö×²Õ
     * ÏàÍ¬ÍøÂç£¬ÒÔ½ÓÊÕ·½ÎªÏÂÒ»ÌøÄ¿µÄµØ·â×°ÒÔÌ«ÍøÖ¡£¬²¢·¢ËÍ±¨ÎÄµ½ÍøÂçÉÏ£¨Ä¿µÄMAC = ½ÓÊÕ·½µÄMAC£¬ Ä¿µÄIP = ½ÓÊÕ·½µÄIP£©
     * ²»Í¬ÍøÂç£¬ÒÔÍø¹ØÎªÏÂÒ»ÌøÄ¿µÄµØ·â×°ÒÔÌ«ÍøÖ¡£¬²¢·¢ËÍ±¨ÎÄµ½ÍøÂçÉÏ£¨Ä¿µÄMAC = Íø¹ØµÄMAC£¬ Ä¿µÄIP = ½ÓÊÕ·½µÄIP£©
 
+> ·â×°ÒÔÌ«ÍøÖ¡Ê±£¬ÐèÒªÖªµÀ½ÓÊÕ·½µÄMACµØÖ·£¬»ñÈ¡MACµØÖ·µÄ·½Ê½²ÉÓÃARPÐ­ÒéÊµÏÖ
+
+
+## ÒÔÌ«ÍøÖ¡¸ñÊ½
+
+ÒÔÌ«ÍøÖ¡¸ñÊ½·ÖÀà£º
+
+* Ethernet II¼´DIX 2.0£ºXeroxÓëDEC¡¢IntelÔÚ1982ÄêÖÆ¶¨µÄÒÔÌ«Íø±ê×¼Ö¡¸ñÊ½¡£CiscoÃû³ÆÎª£ºARPA¡£
+* Ethernet 802.3 raw£ºNovellÔÚ1983Äê¹«²¼µÄ×¨ÓÃÒÔÌ«Íø±ê×¼Ö¡¸ñÊ½¡£CiscoÃû³ÆÎª£ºNovell-Ether¡£
+* Ethernet 802.3 SAP£ºIEEEÔÚ1985Äê¹«²¼µÄEthernet 802.3µÄSAP°æ±¾ÒÔÌ«ÍøÖ¡¸ñÊ½¡£CiscoÃû³ÆÎª£ºSAP¡£
+* Ethernet 802.3 SNAP£ºIEEEÔÚ1985Äê¹«²¼µÄEthernet 802.3µÄSNAP°æ±¾ÒÔÌ«ÍøÖ¡¸ñÊ½¡£CiscoÃû³ÆÎª£ºSNAP¡£
+
+Ethernet IIÖ¡¸ñÊ½
+
+![ÒÔÌ«ÍøÖ¡¸ñÊ½](images/ethernet-frame.png "ÒÔÌ«ÍøÖ¡¸ñÊ½")
+
+ÒÔÌ«ÍøÖ¡³£ÓÃµÄÐ­ÒéÀàÐÍÈçÏÂ£º
+
+* 0x0800 Íø¼ÊÐ­Òé£¨IPV4£©
+* 0x0806 µØÖ·½âÎöÐ­Òé£¨ARP £º Address Resolution Protocol£©
+* 0x8100 VLAN±¨ÎÄ
+* 0x814C ¼òµ¥ÍøÂç¹ÜÀíÐ­Òé£¨SNMP£ºSimple Network Management Protocol£©
+* 0x88CC Á´½Ó²ã·¢ÏÖÐ­Òé£¨LLDP£ºLink Layer Discovery Protocol£©
+
+
+## MACµØÖ··ÖÀà
+
+ÒÔÌ«ÍøÊÇÒÔ48Î»µÄMACµØÖ·À´½øÐÐÑ°Ö·µÄ£¬MACµØÖ··ÖÎªÈçÏÂÈýÀà£º
+
+* µ¥²¥µØÖ·£¬ÀýÈçÎïÀíÍø¿¨Ô¤ÖÃµÄMACµØÖ·
+* ¹ã²¥µØÖ·£¬µØÖ·ÎªFF-FF-FF-FF-FF-FF£¬Í¬ÍøÂçÉÏËùÓÐ½Úµã¾ù»á½ÓÊÕµ½¸Ã±¨ÎÄ
+* ×é²¥µØÖ·£¬×÷Îª×é²¥IPµØÖ·µÄÒ»¸öÓ³Éä£¬ÒªÇóµÚ48Î»bitÖµÎª1¼´¿É£¬¼´MACµØÖ·µÄµÚÒ»¸ö×Ö½ÚÄÚÈÝÎª"XXXXXXX1"£¬¹ã²¥µØÖ·ÊÇÌØÊâµÄ×é²¥µØÖ·
+
 
 ## ÒÔÌ«Íø¹æ·¶¶ÔÔÆÍøÂçµÄÒªÇó
 
 ¸ù¾ÝÉÏÊöÒÔÌ«Íø¹æ·¶ºÍOS·¢°üÔ­Àí£¬¶ÔÓÚÐéÄâ»¯ÍøÂçºÍÈÝÆ÷ÍøÂçµÄ·½°¸£¬ÐèÒª½â¾öÈçÏÂÎÊÌâ£¬²»Í¬µÄ½â·¨¹¹³ÉÁË²»Í¬µÄÍøÂç·½°¸£º
 
-* MACµØÖ·»ñÈ¡·½Ê½
+* MACµØÖ·ÈçºÎ»ñÈ¡
    * ´ú´ð
    * ½ÓÊÕ·½Ó¦´ð
-* IP·ÖÅä
+* IPµØÖ·ÈçºÎ»ñÈ¡
    * DHCP·½Ê½
    * ¾²Ì¬ÅäÖÃ
+
