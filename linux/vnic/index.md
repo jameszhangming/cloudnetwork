@@ -13,13 +13,11 @@
 * vlan£¬802.1q tagged virtual LAN interface
 * vxlan£¬Virtual eXtended LAN
 * ipip£¬Virtual tunnel interface IPv4 over IPv4
-* sit£¬Virtual tunnel interface IPv6 over IPv4
 * gre£¬Virtual tunnel interface GRE over IPv4
 * gretap£¬Virtual L2 tunnel interface GRE over IPv4
 * vti£¬Virtual tunnel interface
 * nlmon£¬Netlink monitoring device
 * ipvlan£¬Interface for L3 (IPv6/IPv4) based VLANs
-* lowpan£¬Interface for 6LoWPAN (IPv6) over IEEE 802.15.4
 * geneve£¬GEneric NEtwork Virtualization Encapsulation
 
 ## ÐéÄâÍø¿¨²Ù×÷
