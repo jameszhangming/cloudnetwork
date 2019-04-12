@@ -30,3 +30,12 @@ UDP的校验和通过三个部分计算得到：
 * SNAT和DNAT
 * VXLAN报文GSO分段
 
+##  基于UDP的协议
+
+以下协议基于UDP：
+
+* TFTP
+* SNMP
+* NFS
+* DNS
+* BOOTP
