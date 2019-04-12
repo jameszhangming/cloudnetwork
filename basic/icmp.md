@@ -77,3 +77,17 @@ Internet Control Message Protocol,Internet控制报文协议,控制消息是指�
 * 限制ICMP数据包的带宽
 * 拒绝所有的ICMP数据包
 
+
+## traceroute
+
+ping程序提供一个记录路由选项，但并不是所有的路由机都支持这个选项，而且IP首部选项字段最多也只能存储9个IP地址，因此开发traceroute是必要的。 traceroute利用了ICMP报文和IP首部的TTL字段。TTL是一个8bit的字段，为路由器的跳站计数器，也表示数据报的生存周期。每个处理数据报的路由器都需要将TTL减一。如果TTL为0或者1，则路由器不转发该数据报，如果TTL为1，路由器丢弃该包并给源地址发送一个ICMP超时报文（如果是主机接收到TTL为1的数据报可以交给上层应用程序）。
+
+traceroute程序开始时发送一个TTL字段为1的UDP数据报（选择一个不可能的值作为UDP端口号），然后将TTL每次加1，以确定路径中每个路由器。每个路由器在丢弃UDP数据报的时候都返回一个ICMP超时报文（如：ICMP time exceeded in-transit, length 36），而最终主机则产生一个ICMP端口不可达报文（如： ICMP 74.125.128.103 udp port 33492 unreachable, length ）。
+
+对每个TTL，发送3份数据报，并且计算打印出往返时间。如果5秒内未收到任意一份回应，则打印一个星号。
+
+需要注意的是：
+
+* 并不能保证现在的路由就是将来所采用的路由；
+* 不能保证ICMP报文的路由与traceroute程序发出的UDP数据报采用同一路由；
+* 返回的ICMP报文中信源的IP地址是UDP数据报到达的路由器接口的IP地址。
