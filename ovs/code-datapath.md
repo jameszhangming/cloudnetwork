@@ -6,6 +6,7 @@ OVS数据面入口：
 
 
 OVS数据面主要有如下入口：
+
 * VLXAN接口
   * 通过UDP Socket注册的vxlan_udp_encap_recv函数进入OVS
 * 物理网卡
