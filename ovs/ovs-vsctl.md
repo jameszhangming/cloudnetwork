@@ -16,7 +16,7 @@ ovs-vsctl是OVS交换机相关操作的命令。
 * column：表中的字段
 * value：为column的值
 
-> 不同table的column在openvswitch/vswitchd/vswitch.xml中定义
+> 所有table的column在openvswitch/vswitchd/vswitch.xml中定义
 
 ## 常用操作
 
