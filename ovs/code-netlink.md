@@ -7,7 +7,7 @@ OVS使用Netlink用于内核态和用户态通信。
 ![netlink-object](images/netlink-object.png "netlink-object")
 
 
-## Ofpbuf数据结构
+## ofpbuf数据结构
 
 OVS使用ofpbuf用于netlink通信。
 
@@ -49,7 +49,7 @@ Void ofpbuf_reserve(struct ofpbuf *b, size_t size)
 }
 ```
 
-新分配空间，返回值为新空间的首地址，长度为size
+新分配空间，返回值为新空间的首地址，长度为size：
 ```
 void * ofpbuf_put_uninit(struct ofpbuf *b, size_t size)
 {
@@ -60,6 +60,9 @@ void * ofpbuf_put_uninit(struct ofpbuf *b, size_t size)
     return p;
 }
 ```
+
+
+## nlattr数据结构
 
 nlattr数据结构定义：
 ```
@@ -259,10 +262,12 @@ error:
 
 ## Netlink消息头定义
 
+Netlink通信时，有标准消息格式定义，除nlmsghdr和genlmsghdr两个标准消息头外，还支持用户自定义的数据。
+
 ![netlink-data](images/netlink-data.png "netlink-data")
 
 
-genl_ops函数可以得到nlattr属性值
+genl_ops函数可以直接得到nlattr属性值
 ```
 static int ovs_vport_cmd_new(struct sk_buff *skb, struct genl_info *info)
 {
