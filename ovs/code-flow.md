@@ -49,3 +49,7 @@ OVSÊý¾ÝÃæÁ÷±í²éÕÒÊÇÍøÂçÐÔÄÜµÄ¹Ø¼ü£¬ºËÐÄÄ¿±êÊÇ¸ù¾ÝSKB±¨ÎÄ¿ìËÙÆ¥Åäµ½Á÷±í£¬OVSÁ÷±íµ
   * maskµÄÊýÁ¿ºÍÁ÷±íÖÐÊ¹ÓÃµÄ×Ö¶ÎÖÖÀàÏà¹Ø£¬Òª¼õÉÙ²»Í¬±¨ÎÄ×Ö¶ÎÆ¥ÅäµÄÊýÁ¿
 * ±¨ÎÄ½øÈëOVSÊ±È«Á¿µÄkey½âÎöÓÐµãÀË·Ñ
 
+
+## ÄÚºËÁ÷±í¸üÐÂ
+
+![flow-update](images/flow-update.png "flow-update")
