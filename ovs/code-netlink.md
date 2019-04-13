@@ -9,7 +9,7 @@ OVS使用Netlink用于内核态和用户态通信。
 
 ## ofpbuf数据结构
 
-OVS使用ofpbuf用于netlink通信。
+OVS使用ofpbuf用于netlink通信时自定义数据。
 
 ofpbuf数据结构定义：
 ```
