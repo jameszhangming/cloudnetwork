@@ -1,10 +1,10 @@
-# Calico容器方案
+# Calico容器网络方案
 
-本文旨在阐述Calico的数据面，由于未搭过Calico容器方案，本文是通过分析互联网上的共享材料加上对Linux网络的经验得出的，如果与实际情况由出入，尽请指出。
+Calico共有两个容器网络方案：Calico BGP和Calico IPIP。
 
 ## Calico BGP方案
 
-Calicao BGP数据面如下：
+Calico BGP数据面如下：
 
 ![calico-bgp](images/calico-bgp.png "calico-bgp")
 
@@ -44,10 +44,10 @@ Calicao BGP数据面如下：
 10. ARP请求报文通过底层网络到达Host2，Host2响应ARP请求，通过底层网络到达Host1
 11. Host1内核修改报文二层头，发送报文给Host2
 12. Host2收包报文，由于目的IP不在本节点，Host2内核会进行报文转发（ip_forward已开启）
-13. Host2查找路由表，发现路由条目，通过califXXXXXX设备可以直达
-14. Host2内核发送ARP请求给容器D，通过califXXXXXX设备发出
+13. Host2查找路由表，发现路由条目，通过califYYYYY设备可以直达
+14. Host2内核发送ARP请求给容器D，通过califYYYYY设备发出
 15. ARP请求报文通过veth设备到达容器D，容器B响应ARP请求，ARP响应通过veth设备到达Host2内核
-16. Host2内核更新报文的二层头，从califXXXXXX设备发出
+16. Host2内核更新报文的二层头，从califYYYYY设备发出
 17. 报文通过veth设备到达容器D
 
 > Host1中关于容器D的路由信息是如何获取的？ 这就是Calico BGP方案的核心，答案是通过BIRD在节点间同步得到
@@ -121,10 +121,10 @@ Calicao IPIP数据面如下：
 13. IPIP设备封装外层MAC头，并从eth0发出报文
 14. Host2接收到IPIP报文，交给ipip协议进行收包处理
 15. ipip协议处理完成后，最终进行ip_forward处理
-16. Host2查找路由表，发现路由条目，通过califXXXXXX设备可以直达
-17. Host2内核发送ARP请求给容器D，通过califXXXXXX设备发出
+16. Host2查找路由表，发现路由条目，通过califYYYYY设备可以直达
+17. Host2内核发送ARP请求给容器D，通过califYYYYY设备发出
 18. ARP请求报文通过veth设备到达容器D，容器B响应ARP请求，ARP响应通过veth设备到达Host2内核
-19. Host2内核更新报文的二层头，从califXXXXXX设备发出
+19. Host2内核更新报文的二层头，从califYYYYY设备发出
 20. 报文通过veth设备到达容器D
 
 
