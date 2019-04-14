@@ -103,7 +103,7 @@ Flannel VXLAN旧版数据面如下：
 16. br0交换机转发报文给容器D
 
 
-由于L3MISS和L2MISS与网上的介绍刚好想法，如下是VXLAN设备处理ARP请求的代码片段：
+由于L3MISS和L2MISS何时上报与网上的文档刚好相反，代码是最有说服力的，如下是VXLAN设备处理ARP请求的代码片段：
 
 ```    
 	n = neigh_lookup(&arp_tbl, &tip, dev);	//查找本地ARP表项
