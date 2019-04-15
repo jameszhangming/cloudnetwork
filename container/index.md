@@ -9,5 +9,10 @@
 * Flannel UDP
 * Flannel VXLAN
 * Flannel VXLANÐÂ°æ
+* Weave Sleeve
+* Weave Fast Datapath
+* Docker NAT
+* Docker Overlay
+* Macvlan
 
 
