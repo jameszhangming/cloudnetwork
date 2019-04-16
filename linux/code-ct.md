@@ -91,7 +91,7 @@ enum ip_conntrack_info {
 
 ### 数据结构
 
-
+![ct-class](images/ct-class.png "ct-class")
 
 ### CT IN流程
 
