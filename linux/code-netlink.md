@@ -1,6 +1,6 @@
 # Netlink
 
-Netlink是Linux系统用于用户态和内核态进行通信的机制，本文将介绍Netlink Generic的工作原理
+Netlink是Linux系统用于用户态和内核态进行通信的机制，本文将介绍Netlink Socket的工作原理
 
 ## Netlink procotol
 
@@ -282,6 +282,25 @@ retry:
 		return err;
 
 	return netlink_sendskb(sk, skb);		// 用户态netlink socket
+}
+
+static struct sock *netlink_getsockbyportid(struct sock *ssk, u32 portid)
+{
+	struct sock *sock;
+	struct netlink_sock *nlk;
+
+	sock = netlink_lookup(sock_net(ssk), ssk->sk_protocol, portid);		//根据协议和端口查找
+	if (!sock)
+		return ERR_PTR(-ECONNREFUSED);
+
+	/* Don't bother queuing skb if kernel socket has no input function */
+	nlk = nlk_sk(sock);
+	if (sock->sk_state == NETLINK_CONNECTED &&
+	    nlk->dst_portid != nlk_sk(ssk)->portid) {
+		sock_put(sock);
+		return ERR_PTR(-ECONNREFUSED);
+	}
+	return sock;
 }
 
 static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
