@@ -4,9 +4,104 @@ Generic Netlink是通用的用户态和内核态进行通信的机制，可以�
 
 关于Netlink相关的实现已经在[Netlink](code-netlink.md)中介绍，本文仅介绍Generic Netlink相关的内容
 
-## Generic Netlink input
+## 内核发消息给用户态
+```c
+void genl_notify(struct genl_family *family,
+		 struct sk_buff *skb, struct net *net, u32 portid, u32 group,
+		 struct nlmsghdr *nlh, gfp_t flags)
+{
+	struct sock *sk = net->genl_sock;		//以内核的genl sock为源sock
+	int report = 0;
 
-genl_rcv函数说明了从用户态Generic Socket发送消息，如何被用户在内核中注册的函数接收
+	if (nlh)
+		report = nlmsg_report(nlh);
+
+	if (WARN_ON_ONCE(group >= family->n_mcgrps))
+		return;
+	group = family->mcgrp_offset + group;
+	nlmsg_notify(sk, skb, portid, group, report, flags);   //发送消息
+}
+
+int nlmsg_notify(struct sock *sk, struct sk_buff *skb, u32 portid,
+		 unsigned int group, int report, gfp_t flags)
+{
+	int err = 0;
+
+	if (group) {
+		int exclude_portid = 0;
+
+		if (report) {
+			atomic_inc(&skb->users);
+			exclude_portid = portid;
+		}
+
+		/* errors reported via destination sk->sk_err, but propagate
+		 * delivery errors if NETLINK_BROADCAST_ERROR flag is set */
+		err = nlmsg_multicast(sk, skb, exclude_portid, group, flags);
+	}
+
+	if (report) {
+		int err2;
+
+		err2 = nlmsg_unicast(sk, skb, portid);    //发送消息
+		if (!err || err == -ESRCH)
+			err = err2;
+	}
+
+	return err;
+}
+
+static inline int nlmsg_unicast(struct sock *sk, struct sk_buff *skb, u32 portid)
+{
+	int err;
+
+	err = netlink_unicast(sk, skb, portid, MSG_DONTWAIT);
+	if (err > 0)
+		err = 0;
+
+	return err;
+}
+
+int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
+		    u32 portid, int nonblock)
+{
+	struct sock *sk;
+	int err;
+	long timeo;
+
+	skb = netlink_trim(skb, gfp_any());
+
+	timeo = sock_sndtimeo(ssk, nonblock);
+retry:
+	sk = netlink_getsockbyportid(ssk, portid);		//根据portid找到netlink_sock对象
+	if (IS_ERR(sk)) {
+		kfree_skb(skb);
+		return PTR_ERR(sk);
+	}
+	if (netlink_is_kernel(sk))
+		return netlink_unicast_kernel(sk, skb, ssk);
+
+	if (sk_filter(sk, skb)) {
+		err = skb->len;
+		kfree_skb(skb);
+		sock_put(sk);
+		return err;
+	}
+
+	err = netlink_attachskb(sk, skb, &timeo, ssk);
+	if (err == 1)
+		goto retry;
+	if (err)
+		return err;
+
+	return netlink_sendskb(sk, skb);    //发送消息，最终会发送到用户态socket的接收队列，并唤醒wait进程
+}
+
+```
+
+## 用户态发消息给内核态
+
+用户态发送消息，从sys_sendmsg，最终会调用到genl_rcv函数，通过该函数进一步会调用到用户在内核中注册的函数
 
 ```c
 static void genl_rcv(struct sk_buff *skb)
