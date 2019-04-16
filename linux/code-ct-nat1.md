@@ -2,57 +2,6 @@
 
 之前一直有个疑问，配置了SNAT和DNAT，为什么不需要对应的配置DNAT和SNAT，内核在哪里帮我们做了呢？ 本篇来解答这个问题
 
-## netfilter hook点优先级
-
-netfilter各hook包含内核的处理函数，同时还支持通过iptables下发的处理操作（如下NF开头的操作）。
-
-* NF_INET_PRE_ROUTING和NF_INET_LOCAL_OUT的CT处理优先级高于NAT
-  * 对于初始报文，那么ct的orign tuple是原始报文（未经过NAT）
-* NF_INET_LOCAL_IN和NF_INET_POST_ROUTING的CT处理优先级低于NAT
-  * 对于初始报文，那么ct的reply tuple是经过NAT的报文
-
-以下列出的各个hook点，按照hook函数的优先级排序，数字越小代表优先级越高：
-
-```bash
-NF_INET_PRE_ROUTING
-ipv4_conntrack_defrag（NF_IP_PRI_CONNTRACK_DEFRAG：-400）
-NF_IP_PRI_RAW：-300
-ipv4_conntrack_in（NF_IP_PRI_CONNTRACK：-200）
-NF_IP_PRI_MANGLE：-150
-iptable_nat_ipv4_in（NF_IP_PRI_NAT_DST：-100）
-NF_IP_PRI_NAT_DST：-100
-NF_IP_PRI_FILTER：0
-
-NF_INET_LOCAL_IN
-NF_IP_PRI_RAW：-300
-NF_IP_PRI_MANGLE：-150
-NF_IP_PRI_FILTER：0
-NF_IP_PRI_NAT_SRC：100
-iptable_nat_ipv4_fn（NF_IP_PRI_NAT_SRC：100）
-ipv4_helper（NF_IP_PRI_CONNTRACK_HELPER：300）
-ipv4_confirm（NF_IP_PRI_CONNTRACK_CONFIRM：MAX）
-
-NF_INET_LOCAL_OUT
-ipv4_conntrack_defrag（NF_IP_PRI_CONNTRACK_DEFRAG：-400）
-NF_IP_PRI_RAW：-300
-ipv4_conntrack_local（NF_IP_PRI_CONNTRACK：-200）
-NF_IP_PRI_MANGLE：-150
-iptable_nat_ipv4_local_fn（NF_IP_PRI_NAT_DST：-100）
-NF_IP_PRI_NAT_DST：-100
-NF_IP_PRI_FILTER：0
-
-NF_INET_POST_ROUTING
-NF_IP_PRI_RAW：-300
-NF_IP_PRI_MANGLE：-150
-NF_IP_PRI_FILTER：0
-NF_IP_PRI_NAT_SRC：100
-iptable_nat_ipv4_out（NF_IP_PRI_NAT_SRC：100）
-ipv4_helper（NF_IP_PRI_CONNTRACK_HELPER:300）
-ipv4_confirm（NF_IP_PRI_CONNTRACK_CONFIRM：MAX）
-
-```
-
-
 ## CT和NAT协同处理流程分析
 
 假设以下场景，来看内核代码的处理逻辑：
