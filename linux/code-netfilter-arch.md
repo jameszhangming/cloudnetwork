@@ -1,5 +1,6 @@
 # Netfilter总体框架
 
+Netfilter是Linux防火墙的内核实现
 
 ## Netfilter Hook点定义
 
