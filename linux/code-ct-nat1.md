@@ -53,12 +53,13 @@ ipv4_confirm（NF_IP_PRI_CONNTRACK_CONFIRM：MAX）
 ## CT和NAT联动分析
 
 假设以下场景，来看内核代码的处理逻辑：
-容器A（10.10.1.2/24） 在Host1上（192.168.0.101/24）
-容器D（10.10.1.5/24） 在Host2上（192.168.0.102/24）
-容器A访问10.10.1.5:80，实际访问192.168.0.102:8080，容器A发出的报文会被Host1执行SNAT操作
-Host2实际收到的报文为（sip:192.168.0.101, sport:1234, dip:192.168.0.102, dport:8080）
 
-* Host2 NF_INET_PRE_ROUTING点CT处理
+* 容器A（10.10.1.2/24） 在Host1上（192.168.0.101/24）
+* 容器D（10.10.1.5/24） 在Host2上（192.168.0.102/24）
+* 容器A访问10.10.1.5:80，实际访问192.168.0.102:8080，容器A发出的报文会被Host1执行SNAT操作
+* Host2实际收到的报文为（sip:192.168.0.101, sport:1234, dip:192.168.0.102, dport:8080）
+
+### Host2 NF_INET_PRE_ROUTING点CT处理
 
 ```c
 static unsigned int ipv4_conntrack_in(const struct nf_hook_ops *ops,
@@ -93,7 +94,7 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	}
 
 	/* rcu_read_lock()ed by nf_hook_slow */
-	l3proto = __nf_ct_l3proto_find(pf);				//找到三层协议，IPv4下为nf_conntrack_l3proto_ipv4
+	l3proto = __nf_ct_l3proto_find(pf);	//找到三层协议，IPv4下为nf_conntrack_l3proto_ipv4
 	ret = l3proto->get_l4proto(skb, skb_network_offset(skb),  //获得四层协议类型
 				   &dataoff, &protonum);
 	if (ret <= 0) {
@@ -200,7 +201,7 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 
 	/* look for tuple match */
 	hash = hash_conntrack_raw(&tuple, zone);
-	h = __nf_conntrack_find_get(net, zone, &tuple, hash);		//根据tuple的hash值，找到内核中tuple对象
+	h = __nf_conntrack_find_get(net, zone, &tuple, hash);  //根据tuple的hash值，找到内核中tuple对象
 	if (!h) {
 		h = init_conntrack(net, tmpl, &tuple, l3proto, l4proto,  //如果未找到，则新建nf_conn对象
 				   skb, dataoff, hash);
@@ -246,8 +247,7 @@ CT {
    }
 ```
 
-
-* Host2 NF_INET_PRE_ROUTING点NAT处理
+### Host2 NF_INET_PRE_ROUTING点NAT处理
 
 ```c
 static unsigned int iptable_nat_ipv4_in(const struct nf_hook_ops *ops,
@@ -308,7 +308,7 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops, struct sk_buff *skb,
 	if (nf_ct_is_untracked(ct))
 		return NF_ACCEPT;
 
-	nat = nf_ct_nat_ext_add(ct);	//添加NAT信息，只有未confirmed的ct会添加nat扩展信息，此时ct处于非confirmed状态
+	nat = nf_ct_nat_ext_add(ct); //添加NAT信息，只有未confirmed的ct会添加nat扩展信息，此时ct处于非confirmed状态
 	if (nat == NULL)
 		return NF_ACCEPT;	//如果没有NAT信息，表示报文未被NAT过，不需要修改
 
@@ -327,10 +327,10 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops, struct sk_buff *skb,
 		/* Seen it before?  This can happen for loopback, retrans,
 		 * or local packets.
 		 */
-		if (!nf_nat_initialized(ct, maniptype)) {	              //此时未执行过NAT操作，此条件满足
+		if (!nf_nat_initialized(ct, maniptype)) {	 //此时未执行过NAT操作，此条件满足
 			unsigned int ret;
 
-			ret = do_chain(ops, skb, state, ct);	 //iptable_nat_do_chain，执行nat表中的规则，假设配置了DNAT规则，执行DNAT操作，最终会调用nf_nat_setup_info修改ct的reply tuple信息
+			ret = do_chain(ops, skb, state, ct);//iptable_nat_do_chain，执行nat表中的规则，假设配置了DNAT规则，执行DNAT操作，最终会调用nf_nat_setup_info修改ct的reply tuple信息
 			if (ret != NF_ACCEPT)
 				return ret;
 
@@ -588,7 +588,7 @@ find_best_ips_proto(u16 zone, struct nf_conntrack_tuple *tuple,
 	if (maniptype == NF_NAT_MANIP_SRC)			//当前为DNAT
 		var_ipp = &tuple->src.u3;
 	else
-		var_ipp = &tuple->dst.u3;				//DNAT阶段，reply的反转tuple的dst即为orgin的dst（即DNAT修改的内容），这个有点绕，相当于复制origin并把dst修改了
+		var_ipp = &tuple->dst.u3;	//DNAT阶段，reply的反转tuple的dst即为orgin的dst（即DNAT修改的内容），这个有点绕，相当于复制origin并把dst修改了
 
 	/* Fast path: only one choice. */
 	if (nf_inet_addr_cmp(&range->min_addr, &range->max_addr)) {
@@ -648,7 +648,7 @@ CT {
 
 内核继续IP层收包，发现报文的目的IP不是本节点，走ip_forward分支，最后进入到NF_INET_POST_ROUTING hook点
 
-* Host2 NF_INET_POST_ROUTING点NAT处理
+### Host2 NF_INET_POST_ROUTING点NAT处理
 
 ```c
 static unsigned int iptable_nat_ipv4_out(const struct nf_hook_ops *ops,
@@ -885,7 +885,7 @@ CT {
    }
 ```
 
-* Host2 NF_INET_POST_ROUTING点CT处理
+### Host2 NF_INET_POST_ROUTING点CT处理
 
 ```c
 static unsigned int ipv4_confirm(const struct nf_hook_ops *ops,
@@ -942,7 +942,7 @@ CT {
 
 Host2内核收到报文时，进入ip层收包后，会先进入NF_INET_PRE_ROUTING点
 
-* Host2 NF_INET_PRE_ROUTING点CT处理
+### Host2 NF_INET_PRE_ROUTING点CT处理
 
 ```c
 static unsigned int ipv4_conntrack_in(const struct nf_hook_ops *ops,
@@ -1068,7 +1068,7 @@ CT {
    }
 ```
 
-* Host2 NF_INET_PRE_ROUTING点NAT处理
+### Host2 NF_INET_PRE_ROUTING点NAT处理
 ```c
 static unsigned int iptable_nat_ipv4_in(const struct nf_hook_ops *ops,
 					struct sk_buff *skb,
@@ -1235,7 +1235,7 @@ CT {
 
 此过程中，报文并未被修改， 内核继续IP层收包，发现报文的目的IP不是本节点，走ip_forward分支，最后进入到NF_INET_POST_ROUTING
 
-* Host2 NF_INET_POST_ROUTING点NAT处理
+### Host2 NF_INET_POST_ROUTING点NAT处理
 
 ```c
 static unsigned int iptable_nat_ipv4_out(const struct nf_hook_ops *ops,
@@ -1453,6 +1453,7 @@ CT {
 ```
 
 至此，接收节点的CT和NAT整个过程已经完成，整个过程比较绕，总结如下：
+
 * CT的tuple只会修改一次，修改发生在origin方向的NAT操作时
 * 在PREROUTING点配置了DNAT，会在POSTROUTING点执行SNAT
 
