@@ -283,4 +283,16 @@ static rtnl_doit_func rtnl_get_doit(int protocol, int msgindex)
 
 ```
 
+## 内核中已注册消息处理函数
+```c
+rtnl_register(PF_UNSPEC, RTM_NEWNEIGH, neigh_add, NULL, NULL);
+rtnl_register(PF_UNSPEC, RTM_DELNEIGH, neigh_delete, NULL, NULL);
+rtnl_register(PF_UNSPEC, RTM_GETNEIGH, NULL, neigh_dump_info, NULL);
+rtnl_register(PF_UNSPEC, RTM_GETNEIGHTBL, NULL, neightbl_dump_info,
+rtnl_register(PF_UNSPEC, RTM_SETNEIGHTBL, neightbl_set, NULL, NULL);
+```
 
+## 内核中已注册消息处理函数
+
+* 系统已注册的消息处理，也支持扩展
+* generic netlink相比rtnetlink提供了一套自定义消息解析机制
