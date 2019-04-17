@@ -4,7 +4,122 @@ Generic Netlink是通用的用户态和内核态进行通信的机制，可以�
 
 关于Netlink相关的实现已经在[Netlink](code-netlink.md)中介绍，本文仅介绍Generic Netlink相关的内容
 
-## 内核发消息给用户态
+
+## 内核Generic Netlink Socket初始化
+```c
+static int __net_init genl_pernet_init(struct net *net)
+{
+	struct netlink_kernel_cfg cfg = {
+		.input		= genl_rcv,               //generic netlink socket处理函数
+		.flags		= NL_CFG_F_NONROOT_RECV,
+		.bind		= genl_bind,
+		.unbind		= genl_unbind,
+	};
+
+	/* we'll bump the group number right afterwards */
+	net->genl_sock = netlink_kernel_create(net, NETLINK_GENERIC, &cfg);  //创建内核socket
+
+	if (!net->genl_sock && net_eq(net, &init_net))
+		panic("GENL: Cannot initialize generic netlink\n");
+
+	if (!net->genl_sock)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static inline struct sock *
+netlink_kernel_create(struct net *net, int unit, struct netlink_kernel_cfg *cfg)
+{
+	return __netlink_kernel_create(net, unit, THIS_MODULE, cfg);
+}
+
+struct sock *
+__netlink_kernel_create(struct net *net, int unit, struct module *module,
+			struct netlink_kernel_cfg *cfg)
+{
+	struct socket *sock;
+	struct sock *sk;
+	struct netlink_sock *nlk;
+	struct listeners *listeners = NULL;
+	struct mutex *cb_mutex = cfg ? cfg->cb_mutex : NULL;
+	unsigned int groups;
+
+	BUG_ON(!nl_table);
+
+	if (unit < 0 || unit >= MAX_LINKS)
+		return NULL;
+
+	if (sock_create_lite(PF_NETLINK, SOCK_DGRAM, unit, &sock))	//创建socket对象
+		return NULL;
+
+	/*
+	 * We have to just have a reference on the net from sk, but don't
+	 * get_net it. Besides, we cannot get and then put the net here.
+	 * So we create one inside init_net and the move it to net.
+	 */
+
+	if (__netlink_create(&init_net, sock, cb_mutex, unit) < 0)
+		goto out_sock_release_nosk;
+
+	sk = sock->sk;
+	sk_change_net(sk, net);
+
+	if (!cfg || cfg->groups < 32)
+		groups = 32;
+	else
+		groups = cfg->groups;
+
+	listeners = kzalloc(sizeof(*listeners) + NLGRPSZ(groups), GFP_KERNEL);
+	if (!listeners)
+		goto out_sock_release;
+
+	sk->sk_data_ready = netlink_data_ready;
+	if (cfg && cfg->input)
+		nlk_sk(sk)->netlink_rcv = cfg->input;		//设置为genl_rcv
+
+	if (netlink_insert(sk, 0))           //socket的portid为0
+		goto out_sock_release;
+
+	nlk = nlk_sk(sk);
+	nlk->flags |= NETLINK_KERNEL_SOCKET;
+
+	netlink_table_grab();
+	if (!nl_table[unit].registered) {
+		nl_table[unit].groups = groups;
+		rcu_assign_pointer(nl_table[unit].listeners, listeners);
+		nl_table[unit].cb_mutex = cb_mutex;
+		nl_table[unit].module = module;
+		if (cfg) {
+			nl_table[unit].bind = cfg->bind;
+			nl_table[unit].unbind = cfg->unbind;
+			nl_table[unit].flags = cfg->flags;
+			if (cfg->compare)
+				nl_table[unit].compare = cfg->compare;
+		}
+		nl_table[unit].registered = 1;
+	} else {
+		kfree(listeners);
+		nl_table[unit].registered++;
+	}
+	netlink_table_ungrab();
+	return sk;
+
+out_sock_release:
+	kfree(listeners);
+	netlink_kernel_release(sk);
+	return NULL;
+
+out_sock_release_nosk:
+	sock_release(sock);
+	return NULL;
+}
+```
+
+## 内核发消息给用户态/内核态
+
+消息发送给哪个socket由portid参数决定，0为内核态
+
 ```c
 void genl_notify(struct genl_family *family,
 		 struct sk_buff *skb, struct net *net, u32 portid, u32 group,
