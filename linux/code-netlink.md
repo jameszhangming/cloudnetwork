@@ -661,3 +661,61 @@ out_sock_release_nosk:
 
 ```
 
+## 内核态Netlink Socket发送消息
+
+```c
+int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
+		    u32 portid, int nonblock)
+{
+	struct sock *sk;
+	int err;
+	long timeo;
+
+	skb = netlink_trim(skb, gfp_any());
+
+	timeo = sock_sndtimeo(ssk, nonblock);
+retry:
+	sk = netlink_getsockbyportid(ssk, portid);		//根据portid找到netlink_sock对象
+	if (IS_ERR(sk)) {
+		kfree_skb(skb);
+		return PTR_ERR(sk);
+	}
+	if (netlink_is_kernel(sk))
+		return netlink_unicast_kernel(sk, skb, ssk);    //发送给内核socket，最终调用不同family的socket会有相应的input函数处理
+
+	if (sk_filter(sk, skb)) {
+		err = skb->len;
+		kfree_skb(skb);
+		sock_put(sk);
+		return err;
+	}
+
+	err = netlink_attachskb(sk, skb, &timeo, ssk);
+	if (err == 1)
+		goto retry;
+	if (err)
+		return err;
+
+	return netlink_sendskb(sk, skb);   //发送给用户态socket，会发送到sock的接收队列，并唤醒wait进程
+}
+
+static struct sock *netlink_getsockbyportid(struct sock *ssk, u32 portid)
+{
+	struct sock *sock;
+	struct netlink_sock *nlk;
+
+	sock = netlink_lookup(sock_net(ssk), ssk->sk_protocol, portid);     //根据协议和端口号查找netlink socket
+	if (!sock)
+		return ERR_PTR(-ECONNREFUSED);
+
+	/* Don't bother queuing skb if kernel socket has no input function */
+	nlk = nlk_sk(sock);
+	if (sock->sk_state == NETLINK_CONNECTED &&
+	    nlk->dst_portid != nlk_sk(ssk)->portid) {
+		sock_put(sock);
+		return ERR_PTR(-ECONNREFUSED);
+	}
+	return sock;
+}
+```
+
