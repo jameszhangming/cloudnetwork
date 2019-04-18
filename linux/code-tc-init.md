@@ -1,6 +1,6 @@
 # Traffic Control
 
-Traffic Control，流量控制，是网络QoS的基础，内核通过Qdisc，class和filter三者来实现，本文将介绍系统默认Qidsc的初始化过程，以及Qidsc、Class和filter配置流程
+Traffic Control（TC）流量控制，是网络QoS的Linux实现，Linux内核通过Qdisc，class和filter三者来实现，本文将介绍系统默认Qidsc的初始化过程，以及Qidsc、Class和filter配置流程。
 
 
 ## 设备默认Qdisc初始化
@@ -8,7 +8,7 @@ Traffic Control，流量控制，是网络QoS的基础，内核通过Qdisc，cla
 默认网卡的Qdisc分两种情况：
 
 * 单队列：基于优先级的先进先出策略
-* 多队列：直接发送
+* 多队列：直接发送到设备驱动
 
 register_netdevice注册设备时，调用如下函数，初始化qdisc：
 ```c
@@ -650,7 +650,7 @@ skip:
 		if (cops && cops->graft) {
 			unsigned long cl = cops->get(parent, classid);
 			if (cl) {
-				err = cops->graft(parent, cl, new, &old);
+				err = cops->graft(parent, cl, new, &old);   //调用class ops的graft操作
 				cops->put(parent, cl);
 			} else
 				err = -ENOENT;
