@@ -1,9 +1,9 @@
-# Qdisc
+# Traffic Control
 
-Qdisc是TC（Traffic Control）的内核实现，本文将介绍系统默认Qidsc初始化过程，以及Qdisc配置流程
+Traffic Control，流量控制，是网络QoS的基础，内核通过Qdisc，class和filter三者来实现，本文将介绍系统默认Qidsc的初始化过程，以及Qidsc、Class和filter配置流程
 
 
-## 设备设置默认Qdisc
+## 设备默认Qdisc初始化
 
 默认网卡的Qdisc分两种情况：
 
@@ -258,9 +258,9 @@ struct Qdisc_ops mq_qdisc_ops __read_mostly = {
 ```
 
 
-## 网卡设置自定义Qdisc
+## TC操作入口函数定义
 
-### 网卡设置Qdisc和Class入口注册
+### Qdisc和Class操作入口
 
 ```c
 	rtnl_register(PF_UNSPEC, RTM_NEWQDISC, tc_modify_qdisc, NULL, NULL);
@@ -271,7 +271,24 @@ struct Qdisc_ops mq_qdisc_ops __read_mostly = {
 	rtnl_register(PF_UNSPEC, RTM_GETTCLASS, tc_ctl_tclass, tc_dump_tclass, NULL);
 ```
 
-### 网卡设置Qdisc
+### Filter操作入口
+
+```c
+	rtnl_register(PF_UNSPEC, RTM_NEWTFILTER, tc_ctl_tfilter, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_DELTFILTER, tc_ctl_tfilter, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_GETTFILTER, tc_ctl_tfilter, tc_dump_tfilter, NULL);
+```
+
+### Action操作入口
+
+```c
+	rtnl_register(PF_UNSPEC, RTM_NEWACTION, tc_ctl_action, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_DELACTION, tc_ctl_action, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_GETACTION, tc_ctl_action, tc_dump_action, NULL);
+```
+
+
+## 创建Qdisc流程
 
 ```c
 static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
@@ -678,4 +695,495 @@ void qdisc_list_add(struct Qdisc *q)
 	}
 }
 ```
+
+
+## 创建Class流程
+
+```c
+static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
+{
+	struct net *net = sock_net(skb->sk);
+	struct tcmsg *tcm = nlmsg_data(n);
+	struct nlattr *tca[TCA_MAX + 1];
+	struct net_device *dev;
+	struct Qdisc *q = NULL;
+	const struct Qdisc_class_ops *cops;
+	unsigned long cl = 0;
+	unsigned long new_cl;
+	u32 portid;
+	u32 clid;
+	u32 qid;
+	int err;
+
+	if ((n->nlmsg_type != RTM_GETTCLASS) &&
+	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL);  //解析参数
+	if (err < 0)
+		return err;
+
+	dev = __dev_get_by_index(net, tcm->tcm_ifindex);   //得到设备
+	if (!dev)
+		return -ENODEV;
+
+	/*
+	   parent == TC_H_UNSPEC - unspecified parent.
+	   parent == TC_H_ROOT   - class is root, which has no parent.
+	   parent == X:0	 - parent is root class.
+	   parent == X:Y	 - parent is a node in hierarchy.
+	   parent == 0:Y	 - parent is X:Y, where X:0 is qdisc.
+
+	   handle == 0:0	 - generate handle from kernel pool.
+	   handle == 0:Y	 - class is X:Y, where X:0 is qdisc.
+	   handle == X:Y	 - clear.
+	   handle == X:0	 - root class.
+	 */
+
+	/* Step 1. Determine qdisc handle X:0 */
+
+	portid = tcm->tcm_parent;
+	clid = tcm->tcm_handle;
+	qid = TC_H_MAJ(clid);		//根据class id获得parent qdisc id
+
+	if (portid != TC_H_ROOT) {
+		u32 qid1 = TC_H_MAJ(portid);  //parent的qdisc id
+
+		if (qid && qid1) {   //如果同时存在，必须相同
+			/* If both majors are known, they must be identical. */
+			if (qid != qid1)
+				return -EINVAL;
+		} else if (qid1) {
+			qid = qid1;
+		} else if (qid == 0)
+			qid = dev->qdisc->handle;
+
+		/* Now qid is genuine qdisc handle consistent
+		 * both with parent and child.
+		 *
+		 * TC_H_MAJ(portid) still may be unspecified, complete it now.
+		 */
+		if (portid)
+			portid = TC_H_MAKE(qid, portid);
+	} else {
+		if (qid == 0)
+			qid = dev->qdisc->handle;
+	}
+
+	/* OK. Locate qdisc */
+	q = qdisc_lookup(dev, qid);    //根据handle的major查找qdisc
+	if (!q)
+		return -ENOENT;
+
+	/* An check that it supports classes */
+	cops = q->ops->cl_ops;			//得到qdisc的class驱动
+	if (cops == NULL)
+		return -EINVAL;
+
+	/* Now try to get class */
+	if (clid == 0) {
+		if (portid == TC_H_ROOT)
+			clid = qid;
+	} else
+		clid = TC_H_MAKE(qid, clid);   //生成classid
+
+	if (clid)
+		cl = cops->get(q, clid);		//根据clid查找class
+
+	if (cl == 0) {
+		err = -ENOENT;
+		if (n->nlmsg_type != RTM_NEWTCLASS ||
+		    !(n->nlmsg_flags & NLM_F_CREATE))
+			goto out;
+	} else {
+		switch (n->nlmsg_type) {
+		case RTM_NEWTCLASS:
+			err = -EEXIST;
+			if (n->nlmsg_flags & NLM_F_EXCL)
+				goto out;
+			break;
+		case RTM_DELTCLASS:
+			err = -EOPNOTSUPP;
+			if (cops->delete)
+				err = cops->delete(q, cl);
+			if (err == 0)
+				tclass_notify(net, skb, n, q, cl, RTM_DELTCLASS);
+			goto out;
+		case RTM_GETTCLASS:
+			err = tclass_notify(net, skb, n, q, cl, RTM_NEWTCLASS);
+			goto out;
+		default:
+			err = -EINVAL;
+			goto out;
+		}
+	}
+
+	new_cl = cl;
+	err = -EOPNOTSUPP;
+	if (cops->change)
+		err = cops->change(q, clid, portid, tca, &new_cl);   //创建class实例与实际Qdisc类型相关，待到相关章节介绍
+	if (err == 0)
+		tclass_notify(net, skb, n, q, new_cl, RTM_NEWTCLASS);
+
+out:
+	if (cl)
+		cops->put(q, cl);
+
+	return err;
+}
+```
+
+
+## 创建Filter流程
+
+```c
+static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n)
+{
+	struct net *net = sock_net(skb->sk);
+	struct nlattr *tca[TCA_MAX + 1];
+	struct tcmsg *t;
+	u32 protocol;
+	u32 prio;
+	u32 nprio;
+	u32 parent;
+	struct net_device *dev;
+	struct Qdisc  *q;
+	struct tcf_proto __rcu **back;
+	struct tcf_proto __rcu **chain;
+	struct tcf_proto *tp;
+	const struct tcf_proto_ops *tp_ops;
+	const struct Qdisc_class_ops *cops;
+	unsigned long cl;
+	unsigned long fh;
+	int err;
+	int tp_created = 0;
+
+	if ((n->nlmsg_type != RTM_GETTFILTER) &&
+	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+
+replay:
+	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, NULL);   //参数解析
+	if (err < 0)
+		return err;
+
+	t = nlmsg_data(n);
+	protocol = TC_H_MIN(t->tcm_info);  
+	prio = TC_H_MAJ(t->tcm_info); 
+	nprio = prio;
+	parent = t->tcm_parent;
+	cl = 0;
+
+	if (prio == 0) {
+		/* If no priority is given, user wants we allocated it. */
+		if (n->nlmsg_type != RTM_NEWTFILTER ||
+		    !(n->nlmsg_flags & NLM_F_CREATE))
+			return -ENOENT;
+		prio = TC_H_MAKE(0x80000000U, 0U);
+	}
+
+	/* Find head of filter chain. */
+
+	/* Find link */
+	dev = __dev_get_by_index(net, t->tcm_ifindex);   //得到设备信息
+	if (dev == NULL)
+		return -ENODEV;
+
+	/* Find qdisc */
+	if (!parent) {
+		q = dev->qdisc;
+		parent = q->handle;
+	} else {
+		q = qdisc_lookup(dev, TC_H_MAJ(t->tcm_parent));   //得到父qdisc
+		if (q == NULL)
+			return -EINVAL;
+	}
+
+	/* Is it classful? */
+	cops = q->ops->cl_ops;   //qdisc是否支持class
+	if (!cops)
+		return -EINVAL;
+
+	if (cops->tcf_chain == NULL)
+		return -EOPNOTSUPP;
+
+	/* Do we search for filter, attached to class? */
+	if (TC_H_MIN(parent)) {          //class的minor不为零，说明parent是class
+		cl = cops->get(q, parent);   //得到class
+		if (cl == 0)
+			return -ENOENT;
+	}
+
+	/* And the last stroke */
+	chain = cops->tcf_chain(q, cl);     //得到class的tcf链表
+	err = -EINVAL;
+	if (chain == NULL)
+		goto errout;
+
+	/* Check the chain for existence of proto-tcf with this priority */
+	for (back = chain;
+	     (tp = rtnl_dereference(*back)) != NULL;
+	     back = &tp->next) {
+		if (tp->prio >= prio) {
+			if (tp->prio == prio) {
+				if (!nprio ||
+				    (tp->protocol != protocol && protocol))
+					goto errout;
+			} else
+				tp = NULL;
+			break;
+		}
+	}
+
+	if (tp == NULL) {
+		/* Proto-tcf does not exist, create new one */
+
+		if (tca[TCA_KIND] == NULL || !protocol)
+			goto errout;
+
+		err = -ENOENT;
+		if (n->nlmsg_type != RTM_NEWTFILTER ||
+		    !(n->nlmsg_flags & NLM_F_CREATE))
+			goto errout;
+
+
+		/* Create new proto tcf */
+
+		err = -ENOBUFS;
+		tp = kzalloc(sizeof(*tp), GFP_KERNEL);        //申请filter
+		if (tp == NULL)
+			goto errout;
+		err = -ENOENT;
+		tp_ops = tcf_proto_lookup_ops(tca[TCA_KIND]);   //得到filter ops
+		if (tp_ops == NULL) {
+#ifdef CONFIG_MODULES
+			struct nlattr *kind = tca[TCA_KIND];
+			char name[IFNAMSIZ];
+
+			if (kind != NULL &&
+			    nla_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+				rtnl_unlock();
+				request_module("cls_%s", name);
+				rtnl_lock();
+				tp_ops = tcf_proto_lookup_ops(kind);
+				/* We dropped the RTNL semaphore in order to
+				 * perform the module load.  So, even if we
+				 * succeeded in loading the module we have to
+				 * replay the request.  We indicate this using
+				 * -EAGAIN.
+				 */
+				if (tp_ops != NULL) {
+					module_put(tp_ops->owner);
+					err = -EAGAIN;
+				}
+			}
+#endif
+			kfree(tp);
+			goto errout;
+		}
+		tp->ops = tp_ops;         //设置filter ops
+		tp->protocol = protocol;
+		tp->prio = nprio ? :
+			       TC_H_MAJ(tcf_auto_prio(rtnl_dereference(*back)));
+		tp->q = q;
+		tp->classify = tp_ops->classify;
+		tp->classid = parent;
+
+		err = tp_ops->init(tp);    //初始化filter
+		if (err != 0) {
+			module_put(tp_ops->owner);
+			kfree(tp);
+			goto errout;
+		}
+
+		tp_created = 1;
+
+	} else if (tca[TCA_KIND] && nla_strcmp(tca[TCA_KIND], tp->ops->kind))
+		goto errout;
+
+	fh = tp->ops->get(tp, t->tcm_handle);   
+
+	if (fh == 0) {
+		if (n->nlmsg_type == RTM_DELTFILTER && t->tcm_handle == 0) {
+			struct tcf_proto *next = rtnl_dereference(tp->next);
+
+			RCU_INIT_POINTER(*back, next);
+
+			tfilter_notify(net, skb, n, tp, fh, RTM_DELTFILTER);
+			tcf_destroy(tp, true);
+			err = 0;
+			goto errout;
+		}
+
+		err = -ENOENT;
+		if (n->nlmsg_type != RTM_NEWTFILTER ||
+		    !(n->nlmsg_flags & NLM_F_CREATE))
+			goto errout;
+	} else {
+		switch (n->nlmsg_type) {
+		case RTM_NEWTFILTER:
+			err = -EEXIST;
+			if (n->nlmsg_flags & NLM_F_EXCL) {
+				if (tp_created)
+					tcf_destroy(tp, true);
+				goto errout;
+			}
+			break;
+		case RTM_DELTFILTER:
+			err = tp->ops->delete(tp, fh);
+			if (err == 0) {
+				struct tcf_proto *next = rtnl_dereference(tp->next);
+
+				tfilter_notify(net, skb, n, tp, fh, RTM_DELTFILTER);
+				if (tcf_destroy(tp, false))
+					RCU_INIT_POINTER(*back, next);
+			}
+			goto errout;
+		case RTM_GETTFILTER:
+			err = tfilter_notify(net, skb, n, tp, fh, RTM_NEWTFILTER);
+			goto errout;
+		default:
+			err = -EINVAL;
+			goto errout;
+		}
+	}
+
+	err = tp->ops->change(net, skb, tp, cl, t->tcm_handle, tca, &fh,
+			      n->nlmsg_flags & NLM_F_CREATE ? TCA_ACT_NOREPLACE : TCA_ACT_REPLACE);
+	if (err == 0) {
+		if (tp_created) {
+			RCU_INIT_POINTER(tp->next, rtnl_dereference(*back));
+			rcu_assign_pointer(*back, tp);
+		}
+		tfilter_notify(net, skb, n, tp, fh, RTM_NEWTFILTER);
+	} else {
+		if (tp_created)
+			tcf_destroy(tp, true);
+	}
+
+errout:
+	if (cl)
+		cops->put(q, cl);
+	if (err == -EAGAIN)
+		/* Replay the request. */
+		goto replay;
+	return err;
+}
+```
+
+
+## 创建Action流程
+
+```c
+static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n)
+{
+	struct net *net = sock_net(skb->sk);
+	struct nlattr *tca[TCA_ACT_MAX + 1];
+	u32 portid = skb ? NETLINK_CB(skb).portid : 0;
+	int ret = 0, ovr = 0;
+
+	if ((n->nlmsg_type != RTM_GETACTION) && !netlink_capable(skb, CAP_NET_ADMIN))
+		return -EPERM;
+
+	ret = nlmsg_parse(n, sizeof(struct tcamsg), tca, TCA_ACT_MAX, NULL);
+	if (ret < 0)
+		return ret;
+
+	if (tca[TCA_ACT_TAB] == NULL) {
+		pr_notice("tc_ctl_action: received NO action attribs\n");
+		return -EINVAL;
+	}
+
+	/* n->nlmsg_flags & NLM_F_CREATE */
+	switch (n->nlmsg_type) {
+	case RTM_NEWACTION:
+		/* we are going to assume all other flags
+		 * imply create only if it doesn't exist
+		 * Note that CREATE | EXCL implies that
+		 * but since we want avoid ambiguity (eg when flags
+		 * is zero) then just set this
+		 */
+		if (n->nlmsg_flags & NLM_F_REPLACE)
+			ovr = 1;
+replay:
+		ret = tcf_action_add(net, tca[TCA_ACT_TAB], n, portid, ovr);
+		if (ret == -EAGAIN)
+			goto replay;
+		break;
+	case RTM_DELACTION:
+		ret = tca_action_gd(net, tca[TCA_ACT_TAB], n,
+				    portid, RTM_DELACTION);
+		break;
+	case RTM_GETACTION:
+		ret = tca_action_gd(net, tca[TCA_ACT_TAB], n,
+				    portid, RTM_GETACTION);
+		break;
+	default:
+		BUG();
+	}
+
+	return ret;
+}
+
+static int
+tcf_action_add(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
+	       u32 portid, int ovr)
+{
+	int ret = 0;
+	LIST_HEAD(actions);
+
+	ret = tcf_action_init(net, nla, NULL, NULL, ovr, 0, &actions);
+	if (ret)
+		goto done;
+
+	/* dump then free all the actions after update; inserted policy
+	 * stays intact
+	 */
+	ret = tcf_add_notify(net, n, &actions, portid);
+	cleanup_a(&actions);
+done:
+	return ret;
+}
+
+int tcf_action_init(struct net *net, struct nlattr *nla,
+				  struct nlattr *est, char *name, int ovr,
+				  int bind, struct list_head *actions)
+{
+	struct nlattr *tb[TCA_ACT_MAX_PRIO + 1];
+	struct tc_action *act;
+	int err;
+	int i;
+
+	err = nla_parse_nested(tb, TCA_ACT_MAX_PRIO, nla, NULL);
+	if (err < 0)
+		return err;
+
+	for (i = 1; i <= TCA_ACT_MAX_PRIO && tb[i]; i++) {
+		act = tcf_action_init_1(net, tb[i], est, name, ovr, bind);
+		if (IS_ERR(act)) {
+			err = PTR_ERR(act);
+			goto err;
+		}
+		act->order = i;
+		list_add_tail(&act->list, actions);
+	}
+	return 0;
+
+err:
+	tcf_action_destroy(actions, bind);
+	return err;
+}
+```
+
+
+## 总结
+
+### handle和classid总结
+
+* parent、handle和classid格式
+  * major:minor
+  * major:[0]
+* qdisc handle的minor必须为零
+* class classid的major必须等于所属qdisc的major
+* class parent的major必须等于所属qdisc的major
 
