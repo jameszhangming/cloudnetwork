@@ -418,7 +418,7 @@ create_n_graft:
 	}
 
 graft:
-	err = qdisc_graft(dev, p, skb, n, clid, q, NULL);		//
+	err = qdisc_graft(dev, p, skb, n, clid, q, NULL);		//为网卡设备的其他发送队列分配qdisc，使用相同的qdisc
 	if (err) {
 		if (q)
 			qdisc_destroy(q);
@@ -542,7 +542,7 @@ qdisc_create(struct net_device *dev, struct netdev_queue *dev_queue,
 				goto err_out4;
 		}
 
-		qdisc_list_add(sch);
+		qdisc_list_add(sch);   //添加到父qdisc的链表中
 
 		return sch;
 	}
@@ -666,6 +666,16 @@ struct Qdisc *dev_graft_qdisc(struct netdev_queue *dev_queue,
 	spin_unlock_bh(root_lock);
 
 	return oqdisc;
+}
+
+void qdisc_list_add(struct Qdisc *q)
+{
+	if ((q->parent != TC_H_ROOT) && !(q->flags & TCQ_F_INGRESS)) {
+		struct Qdisc *root = qdisc_dev(q)->qdisc;		//设备的qdisc为root qdisc（mq_qdisc_ops）
+
+		WARN_ON_ONCE(root == &noop_qdisc);
+		list_add_tail(&q->list, &root->list);
+	}
 }
 ```
 
