@@ -3,7 +3,9 @@
 本文将介绍Qdisc的整体实现框架，具体enqueue和dequeue的算法待到具体的算法实现来讲解，本文主要讲解Qdisc如何集成到内核协议栈。
 
 
-## Qdisc调用入口
+## TC入口
+
+TC的系统入口在dev_queue_xmit二层发包函数中，入口函数为__dev_queue_xmit。
 
 ```c
 static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
@@ -105,6 +107,36 @@ out:
 	return rc;
 }
 
+/*
+__dev_xmit_skb函数是TC实现的核心函数，它是Qdisc框架好内核之间的纽带，该函数的主要流程如下：
+1. 判断qdisc是否处于running状态（即是否有其他进程先进，并且还未退出）
+   1.1 如果是则要去抢busylock锁，避免两个进程同时进入
+2.抢root_lock，防止对qdisc对象的并发修改
+   2.1root_lock锁有两种情况下会释放:
+     2.1.1 进入sch_direct_xmit函数进行发包，发包完成后还会再抢root_lock锁
+	 2.1.2 退出__dev_xmit_skb函数
+3. 根据qdisc状态进行处理
+   3.1 当前disc包含TCQ_F_CAN_BYPASS标记，且缓冲队列为空，且qdisc处于非running状态
+       直接调用sch_direct_xmit发包，发包完成后，check缓冲区是否有包？
+	   3.1.1 有包，则调用__qdisc_run继续发包（此时只会出现在并发场景，其他进程发包）
+	   3.1.2 无包，则调用qdisc_run_end退出running
+   3.2 其他情况
+       qdisc进队列，判断当前qdisc是否处于running状态
+	   3.2.1 处于runnning状态，直接返回
+	   3.2.2 非running状态，调用__qdisc_run继续发包
+4.释放root_lock锁，退出
+
+关于busylock锁：避免第一个进程进来，后续又有两个进程发包；
+申请和释放锁的逻辑如下：
+1. 当进入__dev_xmit_skb函数，qdisc处于running状态时，申请该锁；说明当前为第二个进入此函数的进程；
+2. 释放锁有两种场景：
+   2.1 当前进程进入函数时qdisc处于running状态，然后第一个进程qdisc被关闭，当前进程启动qdisc后，会释放该锁；
+   2.2 当前进程进入函数时qdisc处于running状态，上述3.1.1分支，会释放该锁；
+
+当qdisc的配额不足以发包时，并且后续又没有报文发送，剩余报文如何发出？
+  * __qdisc_run函数中发现还有报文未发送，会调用__netif_schedule触发发包软中断
+  * qdisc的dequeue失败时，会触发watchdog或work，这两个函数均会__netif_schedule触发发包软中断
+*/
 static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				 struct net_device *dev,
 				 struct netdev_queue *txq)
@@ -165,6 +197,11 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 	return rc;
 }
 
+/*
+直接调用驱动发包，返回值比较关键
+1. 非零值， 说明qdisc还有报文缓存
+2. 0，说明qdisc没有报文，或者队列冻结或停止
+*/
 int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 		    struct net_device *dev, struct netdev_queue *txq,
 		    spinlock_t *root_lock, bool validate)
@@ -208,6 +245,11 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	return ret;
 }
 
+/*
+执行qdisc发包，尝试发送一定配额的报文（如果有报文），直到：
+1. qdisc报文发送完成（没有报文，或者流量限制）
+2. 用完发送配额（避免长时间发包），如果配额用户场景，还会触发发包软中断
+*/
 void __qdisc_run(struct Qdisc *q)
 {
 	int quota = weight_p;
@@ -229,6 +271,9 @@ void __qdisc_run(struct Qdisc *q)
 	qdisc_run_end(q);
 }
 
+/*
+从qdisc中收包，并发送给网卡驱动
+*/
 static inline int qdisc_restart(struct Qdisc *q, int *packets)
 {
 	struct netdev_queue *txq;
@@ -249,6 +294,9 @@ static inline int qdisc_restart(struct Qdisc *q, int *packets)
 	return sch_direct_xmit(skb, q, dev, txq, root_lock, validate);   //直接发送报文，发送给驱动
 }
 
+/*
+从qdisc中收包，可以一次取多个报文
+*/
 static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 				   int *packets)
 {
@@ -279,18 +327,5 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 }
 
 ```
-
-## __dev_xmit_skb函数分析
-
-__dev_xmit_skb函数整个qdisc的核心函数
-
-* root_lock全局锁，对qdisc操作进行保护，但是操作中涉及到发包，用sch_direct_xmit，在该函数中会先释放root锁，发包完成后再上锁
-* busylock锁，避免第一个进程进来，后续又有两个进程发包
-* qdisc处于running状态时，说明还有报文可发送
-* 进程进入__dev_xmit_skb未running，那么出此函数时，也会置非running状态
-* 进程进入__dev_xmit_skb处于running，那么只会enqueue，不会dequeue，说明有一个进程在该函数内，该进程会进行dequeue动作
-* 如果当前因为流控而退出时，假设后续没有报文了，那这些报文怎么出队列呢？
-  * __qdisc_run函数中发现还有报文未发送，会调用__netif_schedule触发发包软中断
-  * qdisc的dequeue中会触发watchdog或work，这两个函数均会__netif_schedule触发发包软中断
 
 
