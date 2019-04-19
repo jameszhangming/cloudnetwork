@@ -633,7 +633,7 @@ skip:
 					   dev->qdisc, new);
 			if (new && !new->ops->attach)
 				atomic_inc(&new->refcnt);
-			dev->qdisc = new ? : &noop_qdisc;
+			dev->qdisc = new ? : &noop_qdisc;    //dev也会刷新qdisc信息
 
 			if (new && new->ops->attach)
 				new->ops->attach(new);			//调用qdisc驱动的attach操作
