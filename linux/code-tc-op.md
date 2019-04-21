@@ -2,293 +2,25 @@
 
 Traffic Control（TC）流量控制，是网络QoS的Linux实现，Linux内核通过Qdisc，class和filter三者来实现，本文将介绍系统默认Qidsc的初始化过程，以及Qidsc、Class和filter配置流程。
 
-
-## 设备默认Qdisc初始化
-
-默认网卡的Qdisc分两种情况：
-
-* 单队列：基于优先级的先进先出策略
-* 多队列：直接发送到设备驱动
-
-register_netdevice注册设备时，调用如下函数，初始化qdisc：
-```c
-void dev_init_scheduler(struct net_device *dev)
-{
-	dev->qdisc = &noop_qdisc;
-	netdev_for_each_tx_queue(dev, dev_init_scheduler_queue, &noop_qdisc);   //默认qdisc
-	if (dev_ingress_queue(dev))
-		dev_init_scheduler_queue(dev, dev_ingress_queue(dev), &noop_qdisc);
-
-	setup_timer(&dev->watchdog_timer, dev_watchdog, (unsigned long)dev);
-}
-
-static void dev_init_scheduler_queue(struct net_device *dev,
-				     struct netdev_queue *dev_queue,
-				     void *_qdisc)
-{
-	struct Qdisc *qdisc = _qdisc;
-
-	rcu_assign_pointer(dev_queue->qdisc, qdisc);   //队列设置qdisc
-	dev_queue->qdisc_sleeping = qdisc;
-}
-
-```
-
-__dev_open打开网卡设备时，调用如下函数，完成根Qdisc初始化：
-```c
-void dev_activate(struct net_device *dev)
-{
-	int need_watchdog;
-
-	/* No queueing discipline is attached to device;
-	 * create default one for devices, which need queueing
-	 * and noqueue_qdisc for virtual interfaces
-	 */
-
-	if (dev->qdisc == &noop_qdisc)
-		attach_default_qdiscs(dev);   //挂载默认qdisc，条件满足，网卡open之后重新进此函数将不满足
-
-	if (!netif_carrier_ok(dev))
-		/* Delay activation until next carrier-on event */
-		return;
-
-	need_watchdog = 0;
-	netdev_for_each_tx_queue(dev, transition_one_qdisc, &need_watchdog);
-	if (dev_ingress_queue(dev))
-		transition_one_qdisc(dev, dev_ingress_queue(dev), NULL);
-
-	if (need_watchdog) {
-		dev->trans_start = jiffies;
-		dev_watchdog_up(dev);
-	}
-}
+本文分析有类Qdisc的创建过程，有类Qdisc一般和Class、Filter配合使用
 
 
-static void transition_one_qdisc(struct net_device *dev,
-				 struct netdev_queue *dev_queue,
-				 void *_need_watchdog)
-{
-	struct Qdisc *new_qdisc = dev_queue->qdisc_sleeping;   //新qdisc先放在qdisc_sleeping，然后再设置到qdisc
-	int *need_watchdog_p = _need_watchdog;
+## Qdisc管理
 
-	if (!(new_qdisc->flags & TCQ_F_BUILTIN))
-		clear_bit(__QDISC_STATE_DEACTIVATED, &new_qdisc->state);
-
-	rcu_assign_pointer(dev_queue->qdisc, new_qdisc);       //新disc复制
-	if (need_watchdog_p && new_qdisc != &noqueue_qdisc) {
-		dev_queue->trans_start = 0;
-		*need_watchdog_p = 1;
-	}
-}
-
-static void attach_default_qdiscs(struct net_device *dev)
-{
-	struct netdev_queue *txq;
-	struct Qdisc *qdisc;
-
-	txq = netdev_get_tx_queue(dev, 0);  //获取发送队列
-
-	if (!netif_is_multiqueue(dev) || dev->tx_queue_len == 0) {   //单队列，或者发送队列长度为0
-		netdev_for_each_tx_queue(dev, attach_one_default_qdisc, NULL);
-		dev->qdisc = txq->qdisc_sleeping;    //都设置为新创建根qdisc
-		atomic_inc(&dev->qdisc->refcnt);
-	} else {
-		qdisc = qdisc_create_dflt(txq, &mq_qdisc_ops, TC_H_ROOT);  //创建根qdisc，这个qdisc没有enqueue函数
-		if (qdisc) {
-			dev->qdisc = qdisc;         //qdisc赋值给dev
-			qdisc->ops->attach(qdisc);  
-		}
-	}
-}
-
-static void attach_one_default_qdisc(struct net_device *dev,
-				     struct netdev_queue *dev_queue,
-				     void *_unused)
-{
-	struct Qdisc *qdisc = &noqueue_qdisc;   //没有enqueue函数
-
-	if (dev->tx_queue_len) {
-		qdisc = qdisc_create_dflt(dev_queue,
-					  default_qdisc_ops, TC_H_ROOT);   //创建根qdisc，单队列场景
-		if (!qdisc) {
-			netdev_info(dev, "activation failed\n");
-			return;
-		}
-		if (!netif_is_multiqueue(dev))
-			qdisc->flags |= TCQ_F_ONETXQUEUE;
-	}
-	dev_queue->qdisc_sleeping = qdisc;      //没有enqueue函数
-}
-
-struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
-				const struct Qdisc_ops *ops,
-				unsigned int parentid)
-{
-	struct Qdisc *sch;
-
-	if (!try_module_get(ops->owner))
-		goto errout;
-
-	sch = qdisc_alloc(dev_queue, ops);		//创建qdisc
-	if (IS_ERR(sch))
-		goto errout;
-	sch->parent = parentid;    //设置parent
-
-	if (!ops->init || ops->init(sch, NULL) == 0)   //qdisc初始化
-		return sch;
-
-	qdisc_destroy(sch);
-errout:
-	return NULL;
-}
-
-struct Qdisc *qdisc_alloc(struct netdev_queue *dev_queue,
-			  const struct Qdisc_ops *ops)
-{
-	void *p;
-	struct Qdisc *sch;
-	unsigned int size = QDISC_ALIGN(sizeof(*sch)) + ops->priv_size;  //根据不同的ops创建不同的qdisc对象
-	int err = -ENOBUFS;
-	struct net_device *dev = dev_queue->dev;
-
-	p = kzalloc_node(size, GFP_KERNEL,
-			 netdev_queue_numa_node_read(dev_queue));
-
-	if (!p)
-		goto errout;
-	sch = (struct Qdisc *) QDISC_ALIGN((unsigned long) p);
-	/* if we got non aligned memory, ask more and do alignment ourself */
-	if (sch != p) {
-		kfree(p);
-		p = kzalloc_node(size + QDISC_ALIGNTO - 1, GFP_KERNEL,
-				 netdev_queue_numa_node_read(dev_queue));
-		if (!p)
-			goto errout;
-		sch = (struct Qdisc *) QDISC_ALIGN((unsigned long) p);
-		sch->padded = (char *) sch - (char *) p;
-	}
-	INIT_LIST_HEAD(&sch->list);
-	skb_queue_head_init(&sch->q);
-
-	spin_lock_init(&sch->busylock);
-	lockdep_set_class(&sch->busylock,
-			  dev->qdisc_tx_busylock ?: &qdisc_tx_busylock);
-
-	sch->ops = ops;
-	sch->enqueue = ops->enqueue;
-	sch->dequeue = ops->dequeue;
-	sch->dev_queue = dev_queue;   //赋值dev_queue
-	dev_hold(dev);
-	atomic_set(&sch->refcnt, 1);
-
-	return sch;
-errout:
-	return ERR_PTR(err);
-}
-```
-
-
-### 默认单队列的Qdisc
-```c
-const struct Qdisc_ops *default_qdisc_ops = &pfifo_fast_ops;  //单队列的默认Qdisc是基于优先级的算法，高优先级发完再发低优先级的
-
-struct Qdisc_ops pfifo_fast_ops __read_mostly = {
-	.id		=	"pfifo_fast",
-	.priv_size	=	sizeof(struct pfifo_fast_priv),
-	.enqueue	=	pfifo_fast_enqueue,
-	.dequeue	=	pfifo_fast_dequeue,
-	.peek		=	pfifo_fast_peek,
-	.init		=	pfifo_fast_init,
-	.reset		=	pfifo_fast_reset,
-	.dump		=	pfifo_fast_dump,
-	.owner		=	THIS_MODULE,
-};
-
-static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc *qdisc)
-{
-	if (skb_queue_len(&qdisc->q) < qdisc_dev(qdisc)->tx_queue_len) {  
-		int band = prio2band[skb->priority & TC_PRIO_MAX];  //优先级转band，共有3中bond
-		struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
-		struct sk_buff_head *list = band2list(priv, band);   //共三个链表
-
-		priv->bitmap |= (1 << band);   //bitmap记录哪些band有数据
-		qdisc->q.qlen++;  //报文数加一
-		return __qdisc_enqueue_tail(skb, qdisc, list);   //添加到队列中
-	}
-
-	return qdisc_drop(skb, qdisc);  //丢弃报文
-}
-
-static struct sk_buff *pfifo_fast_dequeue(struct Qdisc *qdisc)
-{
-	struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
-	int band = bitmap2band[priv->bitmap];     //根据bitmap，获得band，通过数组用空间换时间，队列数少可行
-
-	if (likely(band >= 0)) {
-		struct sk_buff_head *list = band2list(priv, band);
-		struct sk_buff *skb = __qdisc_dequeue_head(qdisc, list);  //从队列中获取skb
-
-		qdisc->q.qlen--;
-		if (skb_queue_empty(list))
-			priv->bitmap &= ~(1 << band);    //如果该链表为空，则标记该位为空
-
-		return skb;
-	}
-
-	return NULL;
-}
-
-```
-
-### 默认多队列的Qdisc
-
-默认多队列的情况下，是不开启Qdisc的，直接发送报文
-
-```c
-struct Qdisc_ops mq_qdisc_ops __read_mostly = {
-	.cl_ops		= &mq_class_ops,
-	.id		= "mq",
-	.priv_size	= sizeof(struct mq_sched),
-	.init		= mq_init,
-	.destroy	= mq_destroy,
-	.attach		= mq_attach,
-	.dump		= mq_dump,
-	.owner		= THIS_MODULE,
-};
-```
-
-
-## TC操作入口函数定义
-
-### Qdisc和Class操作入口
+### Qdisc管理函数定义
 
 ```c
 	rtnl_register(PF_UNSPEC, RTM_NEWQDISC, tc_modify_qdisc, NULL, NULL);
 	rtnl_register(PF_UNSPEC, RTM_DELQDISC, tc_get_qdisc, NULL, NULL);
 	rtnl_register(PF_UNSPEC, RTM_GETQDISC, tc_get_qdisc, tc_dump_qdisc, NULL);
-	rtnl_register(PF_UNSPEC, RTM_NEWTCLASS, tc_ctl_tclass, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_DELTCLASS, tc_ctl_tclass, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_GETTCLASS, tc_ctl_tclass, tc_dump_tclass, NULL);
 ```
 
-### Filter操作入口
+### 创建Qdisc流程
 
-```c
-	rtnl_register(PF_UNSPEC, RTM_NEWTFILTER, tc_ctl_tfilter, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_DELTFILTER, tc_ctl_tfilter, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_GETTFILTER, tc_ctl_tfilter, tc_dump_tfilter, NULL);
-```
+Qdisc按照parent可以分两类：
 
-### Action操作入口
-
-```c
-	rtnl_register(PF_UNSPEC, RTM_NEWACTION, tc_ctl_action, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_DELACTION, tc_ctl_action, NULL, NULL);
-	rtnl_register(PF_UNSPEC, RTM_GETACTION, tc_ctl_action, tc_dump_action, NULL);
-```
-
-
-## 创建Qdisc流程
+* 根Qdisc
+* 子Qdisc（parent为class）
 
 ```c
 static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n)
@@ -322,10 +54,10 @@ replay:
 	if (clid) {
 		if (clid != TC_H_ROOT) {
 			if (clid != TC_H_INGRESS) {
-				p = qdisc_lookup(dev, TC_H_MAJ(clid));
+				p = qdisc_lookup(dev, TC_H_MAJ(clid));   //找到父parent
 				if (!p)
 					return -ENOENT;
-				q = qdisc_leaf(p, clid);
+				q = qdisc_leaf(p, clid);   //找到parent的leaf qdisc
 			} else if (dev_ingress_queue_create(dev)) {
 				q = dev_ingress_queue(dev)->qdisc_sleeping;
 			}
@@ -435,7 +167,7 @@ create_n_graft:
 	}
 
 graft:
-	err = qdisc_graft(dev, p, skb, n, clid, q, NULL);		//为网卡设备的其他发送队列分配qdisc，使用相同的qdisc
+	err = qdisc_graft(dev, p, skb, n, clid, q, NULL);	//为网卡设备的其他发送队列分配qdisc，使用相同的qdisc
 	if (err) {
 		if (q)
 			qdisc_destroy(q);
@@ -534,7 +266,7 @@ qdisc_create(struct net_device *dev, struct netdev_queue *dev_queue,
 				err = PTR_ERR(stab);
 				goto err_out4;
 			}
-			rcu_assign_pointer(sch->stab, stab);
+			rcu_assign_pointer(sch->stab, stab);		//初始化stab
 		}
 		if (tca[TCA_RATE]) {
 			spinlock_t *root_lock;
@@ -633,7 +365,7 @@ skip:
 					   dev->qdisc, new);
 			if (new && !new->ops->attach)
 				atomic_inc(&new->refcnt);
-			dev->qdisc = new ? : &noop_qdisc;    //dev也会刷新qdisc信息
+			dev->qdisc = new ? : &noop_qdisc;    //dev也会刷新qdisc信息，整个内核仅在此处修改dev的qdisc
 
 			if (new && new->ops->attach)
 				new->ops->attach(new);			//调用qdisc驱动的attach操作
@@ -696,8 +428,18 @@ void qdisc_list_add(struct Qdisc *q)
 }
 ```
 
+## Class管理
 
-## 创建Class流程
+
+### Class操作管理函数定义
+
+```c
+	rtnl_register(PF_UNSPEC, RTM_NEWTCLASS, tc_ctl_tclass, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_DELTCLASS, tc_ctl_tclass, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_GETTCLASS, tc_ctl_tclass, tc_dump_tclass, NULL);
+```
+
+### 创建Class流程
 
 ```c
 static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
@@ -834,7 +576,19 @@ out:
 ```
 
 
-## 创建Filter流程
+## Filter管理
+
+
+### Filter管理函数定义
+
+```c
+	rtnl_register(PF_UNSPEC, RTM_NEWTFILTER, tc_ctl_tfilter, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_DELTFILTER, tc_ctl_tfilter, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_GETTFILTER, tc_ctl_tfilter, tc_dump_tfilter, NULL);
+```
+
+
+### 创建Filter流程
 
 ```c
 static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n)
@@ -1069,6 +823,18 @@ errout:
 		goto replay;
 	return err;
 }
+```
+
+
+## Action管理
+
+
+### Action管理函数定义
+
+```c
+	rtnl_register(PF_UNSPEC, RTM_NEWACTION, tc_ctl_action, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_DELACTION, tc_ctl_action, NULL, NULL);
+	rtnl_register(PF_UNSPEC, RTM_GETACTION, tc_ctl_action, tc_dump_action, NULL);
 ```
 
 
