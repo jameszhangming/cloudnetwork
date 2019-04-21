@@ -8,6 +8,11 @@
 ![rcv-arch](images/rcv-arch.png "rcv-arch")
 
 
+## 整体收发包流程
+
+![dp](images/dp.png "dp")
+
+
 ## 链路层收包
 
 链路层收包是以太报文进入Linux内核的通道。
