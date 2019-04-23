@@ -236,7 +236,7 @@ qdisc_create(struct net_device *dev, struct netdev_queue *dev_queue,
 		lockdep_set_class(qdisc_lock(sch), &qdisc_rx_lock);
 	} else {
 		if (handle == 0) {
-			handle = qdisc_alloc_handle(dev);		//handle是32位数值
+			handle = qdisc_alloc_handle(dev);		//handle是32位数值，取值为[8000-FFFF]:0000
 			err = -ENOMEM;
 			if (handle == 0)
 				goto err_out3;
@@ -498,7 +498,7 @@ static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
 		} else if (qid1) {
 			qid = qid1;
 		} else if (qid == 0)
-			qid = dev->qdisc->handle;
+			qid = dev->qdisc->handle;   //class的parent为dev的qdisc
 
 		/* Now qid is genuine qdisc handle consistent
 		 * both with parent and child.
@@ -527,7 +527,7 @@ static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n)
 		if (portid == TC_H_ROOT)
 			clid = qid;
 	} else
-		clid = TC_H_MAKE(qid, clid);   //生成classid
+		clid = TC_H_MAKE(qid, clid);   //根据qid和cid生成classid
 
 	if (clid)
 		cl = cops->get(q, clid);		//根据clid查找class

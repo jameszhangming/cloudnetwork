@@ -226,7 +226,7 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 
 	if (dev_xmit_complete(ret)) {
 		/* Driver sent out skb successfully or skb was consumed */
-		ret = qdisc_qlen(q);			//成功发送报文，如果缓存区中还有报文，则尝试继续发送报文
+		ret = qdisc_qlen(q);			//成功发送报文，如果qdisc直接发送队列中还有报文，则尝试继续发送报文
 	} else if (ret == NETDEV_TX_LOCKED) {
 		/* Driver try lock failed */
 		ret = handle_dev_cpu_collision(skb, txq, q);
