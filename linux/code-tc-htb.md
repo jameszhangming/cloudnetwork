@@ -239,7 +239,7 @@ static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch,
 
 ```c
 /*
-1、level0层为leaf class，只有当leaf class发包完成后，level1才可能发包；
+1、level0层为leaf class，只有当leaf class发包完成后，level1才可能发包；（同一level中高优先发完包，再发低优先级的）
      1.1 level0层class发包完成只有两种可能：1）报文发送完成，该class去激活；2）令牌消耗完成，变成borrow状态； 并添加到其parent的feed树中；
 2、L1~L7属于inner class的调度，采用深度优先的调度方式，以L1为例：
       得到L1树中的一个节点，得到class对象，遍历该class的feed树，此时选择的class借用的是L1层的tokens，可以逐层往上借用，直到class变成不能发送状态；
@@ -593,6 +593,23 @@ static void htb_deactivate_prios(struct htb_sched *q, struct htb_class *cl)
 
 
 #### 更新class令牌值和状态
+
+更新令牌时，如果该class deactive，那么他和他的child将没有机会借用令牌发包；
+正常情况下，parent的令牌数应该多于child；
+
+![tc-charge-class](images/tc-charge-class.png "tc-charge-class")
+
+class的状态变化逻辑如下：
+
+* 当class的c令牌数小于低水位时，模式变成CANT_SEND；
+* 当class的令牌数大于高水位时，模式变成CAN_SEND，将添加到qdisc的row树中；
+* 其他，模式变成CAN_BORROW，将添加到parent的feed树中；
+
+
+从上图可以看出，在报文不均衡发送场景：
+
+1. 整体负载不高情况下，HTB算法瞬时最多能够发送两倍的上限带宽；
+2. 整体负载高，HTB算法瞬时最多能够发送两倍的带宽；
 
 ```c
 static void htb_charge_class(struct htb_sched *q, struct htb_class *cl,
