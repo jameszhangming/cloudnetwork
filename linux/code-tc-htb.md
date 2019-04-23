@@ -7,16 +7,18 @@ HTB(Hierarchical Token Bucket) 分层的令牌桶一个分类的令牌桶过滤�
 ### 类状态
 
 某个时刻每个类可以处于三种状态中的一种：
-CAN_SEND：令牌充足的,发送的网络包小于rate,例图中用绿色表示
-MAY_BORROW：没有令牌,但可借用.发送的网络包大于rate小于ceil,例图中用黄色表示
-CANT_SEND：没有令牌不可借用,发送的网络包大于ceil,例图中用红色表示
+
+* CAN_SEND：令牌充足的,发送的网络包小于rate,例图中用绿色表示
+* MAY_BORROW：没有令牌,但可借用.发送的网络包大于rate小于ceil,例图中用黄色表示
+* CANT_SEND：没有令牌不可借用,发送的网络包大于ceil,例图中用红色表示
 
 ### 出包策略
 
-HTB是如何决策哪个类出包的？
-1、HTB算法从类树的底部开始往上找CAN_SEND状态的class。如果找到某一层有CAN_SEND状态的类则停止。
-2、如果该层中有多个class处于CAN_SEND状态则选取优先级最高(priority最小)的class。如果最高优先级还是有多个class，那就在这些类中轮训处理。每个类每发送自己的quantum个字节后，轮到下一个类发送。
-3、上面有讲到只有leafclass才可以缓存网络包,innerclass是没有网络包的。如果步骤1，2最终选到了innerclass怎么处理？既然是innerclass,肯定有自己的subclass.innerclass会顺着树往下找,找到一个子孙leafclass.并且该leafclass处于MAY_BORROW状态,将自己富余的令牌借给该leafclass让其出包。同样的道理,可能会有多个子孙leafclass处于MAY_BORROW状态，这里的处理跟步骤2是一样的。
+HTB是如何决策哪个类出包的:
+
+1. HTB算法从类树的底部开始往上找CAN_SEND状态的class。如果找到某一层有CAN_SEND状态的类则停止。
+2. 如果该层中有多个class处于CAN_SEND状态则选取优先级最高(priority最小)的class。如果最高优先级还是有多个class，那就在这些类中轮训处理。每个类每发送自己的quantum个字节后，轮到下一个类发送。
+3. 上面有讲到只有leafclass才可以缓存网络包,innerclass是没有网络包的。如果步骤1，2最终选到了innerclass怎么处理？既然是innerclass,肯定有自己的subclass.innerclass会顺着树往下找,找到一个子孙leafclass.并且该leafclass处于MAY_BORROW状态,将自己富余的令牌借给该leafclass让其出包。同样的道理,可能会有多个子孙leafclass处于MAY_BORROW状态，这里的处理跟步骤2是一样的。
 
 
 ## HTB Qdisc
