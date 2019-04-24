@@ -23,7 +23,21 @@ static int __net_init rtnetlink_net_init(struct net *net)
 ```
 
 
-## 注册rtnetlink消息处理函数
+## 内核rtnetlink消息
+
+
+### 内核中已注册消息处理函数
+```c
+rtnl_register(PF_UNSPEC, RTM_NEWNEIGH, neigh_add, NULL, NULL);
+rtnl_register(PF_UNSPEC, RTM_DELNEIGH, neigh_delete, NULL, NULL);
+rtnl_register(PF_UNSPEC, RTM_GETNEIGH, NULL, neigh_dump_info, NULL);
+rtnl_register(PF_UNSPEC, RTM_GETNEIGHTBL, NULL, neightbl_dump_info,
+rtnl_register(PF_UNSPEC, RTM_SETNEIGHTBL, neightbl_set, NULL, NULL);
+......
+```
+
+
+### rtnetlink注册函数定义
 
 ```c
 void rtnl_register(int protocol, int msgtype,
@@ -220,7 +234,7 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	if (type > RTM_MAX)
 		return -EOPNOTSUPP;
 
-	type -= RTM_BASE;
+	type -= RTM_BASE;      //type转化为index
 
 	/* All the messages must have at least 1 byte length */
 	if (nlmsg_len(nlh) < sizeof(struct rtgenmsg))
@@ -271,26 +285,37 @@ static rtnl_doit_func rtnl_get_doit(int protocol, int msgindex)
 	struct rtnl_link *tab;
 
 	if (protocol <= RTNL_FAMILY_MAX)
-		tab = rtnl_msg_handlers[protocol]; 
+		tab = rtnl_msg_handlers[protocol]; 		//优先使用protocol
 	else
 		tab = NULL;
 
-	if (tab == NULL || tab[msgindex].doit == NULL)
-		tab = rtnl_msg_handlers[PF_UNSPEC];
+	if (tab == NULL || tab[msgindex].doit == NULL)   
+		tab = rtnl_msg_handlers[PF_UNSPEC];    //查找PF_UNSPEC协议
 
 	return tab[msgindex].doit;   //获取之前注册的处理函数
 }
-
 ```
 
-## 内核中已注册消息处理函数
+## 用户态rnnetlink socket应用
+
+1. 创建socket（PF_NETLINK，SOCK_DGRAM，NETLINK_ROUTE）
+2. socket connect操作
 ```c
-rtnl_register(PF_UNSPEC, RTM_NEWNEIGH, neigh_add, NULL, NULL);
-rtnl_register(PF_UNSPEC, RTM_DELNEIGH, neigh_delete, NULL, NULL);
-rtnl_register(PF_UNSPEC, RTM_GETNEIGH, NULL, neigh_dump_info, NULL);
-rtnl_register(PF_UNSPEC, RTM_GETNEIGHTBL, NULL, neightbl_dump_info,
-rtnl_register(PF_UNSPEC, RTM_SETNEIGHTBL, neightbl_set, NULL, NULL);
+memset(&remote, 0, sizeof remote);
+remote.nl_family = AF_NETLINK;
+remote.nl_pid = 0;
+connect(fd, (struct sockaddr *) &remote, sizeof remote)
 ```
+3. socket发送消息
+
+
+### 消息头格式
+
+nlmsghdr + rtgenmsg：
+
+* nlmsghdr->nlmsg_type，指定消息类型，例如RTM_NEWNEIGH
+* rtgenmsg->rtgen_family，指定协议类型，例如PF_UNSPEC，NETLINK_ROUTE等等
+
 
 ## 内核中已注册消息处理函数
 

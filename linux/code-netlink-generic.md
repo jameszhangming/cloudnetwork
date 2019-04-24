@@ -569,7 +569,21 @@ error:
 	return error;
 }
 
-## Generic Netlink Socket消息头定义
+
+## 用户态Generic Netlink socket应用
+
+1. 创建socket（PF_NETLINK，SOCK_DGRAM，NETLINK_GENERIC）
+2. socket connect操作
+```c
+memset(&remote, 0, sizeof remote);
+remote.nl_family = AF_NETLINK;
+remote.nl_pid = 0;
+connect(fd, (struct sockaddr *) &remote, sizeof remote)
+```
+3. socket发送消息
+
+
+### Generic Netlink Socket消息头定义
 
 发送Generic Netlink Socket消息需要符合标准定义，其中nlmsghdr和genlmsghdr是必须的消息头，之后可以自定义消息内容
 
