@@ -18,7 +18,8 @@ mode { private | vepa | bridge | passthru  [ nopromisc ] }   设备转发模式
   * In bridge mode, all endpoints are directly connected to each other, communication is not redirected through the physical interface's peer.
 * mode passthru [ nopromisc ] 
   * This mode gives more power to a single endpoint, usually in macvtap mode. It is not allowed for more than one endpoint on the same physical interface. All traffic will be forwarded to this end-point, allowing virtio guests to change MAC address or set promiscuous mode in order to bridge the interface or create vlan interfaces on top of it. By default, this mode forces the underlying interface into promiscuous mode. Passing the nopromisc flag prevents this, so the promisc flag may be controlled using standard tools.
-
+* mode source
+  * allows one to set a list of allowed mac address, which is used to match against source mac address from received frames on underlying interface. This allows creating mac based VLAN associations, instead of standard port or tag based. The feature is useful to deploy 802.1x mac based behavior, where drivers of underlying interfaces doesn't allows that.
 
 ### 模式解释
 
