@@ -56,12 +56,11 @@ static __init int veth_init(void)
 veth设备的创建入口为rtnl_newlink函数（虚拟网卡创建入口），根据调用顺序来分析各个函数：
 
 1. rtnl_link_ops->validate（根据type找到rtnl_link_ops，校验输入参数）
-2. rtnl_link_ops->changelink（修改父设备link信息，根据需要）  //未定义
-3. rtnl_link_ops->setup（设备初始化，默认初始化）
-4. rtnl_link_ops->newlink（创建设备，一般会有如下两个操作）
-5. dev->netdev_ops->ndo_init（设备初始化）
-6. dev->netdev_ops->ndo_validate_addr（设备地址校验）   //未定义
-7. dev->netdev_ops->ndo_open（打开设备）
+2. rtnl_link_ops->setup（设备初始化，默认初始化）
+3. rtnl_link_ops->newlink（创建设备，一般会有如下两个操作）
+4. dev->netdev_ops->ndo_init（设备初始化）
+5. dev->netdev_ops->ndo_validate_addr（设备地址校验）   //未定义
+6. dev->netdev_ops->ndo_open（打开设备）
 
 ### validate(veth_validate)
 

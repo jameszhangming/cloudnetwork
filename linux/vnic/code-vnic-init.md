@@ -582,7 +582,7 @@ static int __dev_open(struct net_device *dev)
 
 * rtnl_newlink（创建入口）
 	1. rtnl_link_ops->validate（根据type找到rtnl_link_ops，校验输入参数）
-	2. rtnl_link_ops->changelink（修改父设备link信息，根据需要）
+	2. m_ops->slave_changelink（修改父设备link信息，根据需要）
 	3. 如果设备已存在，调用do_setlink（修改设备），并返回
     4. rtnl_group_changelink
     5. rtnl_create_link（创建net_device设备，实际是虚拟设备对象）
