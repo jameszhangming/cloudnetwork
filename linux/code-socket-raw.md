@@ -142,7 +142,7 @@ int ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 int __ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
+	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;   //目的IP和目的PORT
 	struct flowi4 *fl4;
 	struct rtable *rt;
 	__be32 saddr;
@@ -379,7 +379,7 @@ static int raw_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 ```
 
 
-## raw socket收包
+## raw socket协议栈收包
 
 在内核协议栈处理报文时，ip本地报文处理函数ip_local_deliver_finish中会检查是否raw socket收包。
 
@@ -477,6 +477,83 @@ static int raw_rcv_skb(struct sock *sk, struct sk_buff *skb)
 
 	return NET_RX_SUCCESS;
 }
+```
+
+
+## raw socket协议栈收包
+
+用户态程序调用recvmsg系统调用接收消息时，最终会调用到inet_sockraw_ops的recvmsg函数。
+
+```c
+int inet_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
+		 int flags)
+{
+	struct sock *sk = sock->sk;
+	int addr_len = 0;
+	int err;
+
+	sock_rps_record_flow(sk);
+
+	err = sk->sk_prot->recvmsg(sk, msg, size, flags & MSG_DONTWAIT,
+				   flags & ~MSG_DONTWAIT, &addr_len);
+	if (err >= 0)
+		msg->msg_namelen = addr_len;
+	return err;
+}
+
+static int raw_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
+		       int noblock, int flags, int *addr_len)
+{
+	struct inet_sock *inet = inet_sk(sk);
+	size_t copied = 0;
+	int err = -EOPNOTSUPP;
+	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
+	struct sk_buff *skb;
+
+	if (flags & MSG_OOB)
+		goto out;
+
+	if (flags & MSG_ERRQUEUE) {
+		err = ip_recv_error(sk, msg, len, addr_len);
+		goto out;
+	}
+
+	skb = skb_recv_datagram(sk, flags, noblock, &err);   //从socket收包队列收包
+	if (!skb)
+		goto out;
+
+	copied = skb->len;
+	if (len < copied) {
+		msg->msg_flags |= MSG_TRUNC;
+		copied = len;
+	}
+
+	err = skb_copy_datagram_msg(skb, 0, msg, copied);   //拷贝报文
+	if (err)
+		goto done;
+
+	sock_recv_ts_and_drops(msg, sk, skb);
+
+	/* Copy the address. */
+	if (sin) {
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
+		sin->sin_port = 0;
+		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
+		*addr_len = sizeof(*sin);
+	}
+	if (inet->cmsg_flags)
+		ip_cmsg_recv(msg, skb);
+	if (flags & MSG_TRUNC)
+		copied = skb->len;
+done:
+	skb_free_datagram(sk, skb);
+out:
+	if (err)
+		return err;
+	return copied;
+}
+
 ```
 
 
