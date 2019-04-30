@@ -2,7 +2,7 @@
 
 使用ip link命令创建veth设备。
 
-## 设备参数
+## 设备特有参数
 
 peer name <veth_con>     指定veth对端的设备名
 

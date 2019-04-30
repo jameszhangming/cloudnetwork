@@ -121,26 +121,6 @@ id ID                           specifies the VXLAN Network Identifer (or VXLAN 
 [ gbp ]	                        enables the Group Policy extension (VXLAN-GBP).
 ```
 
-### veth设备
-```bash
-ip link add dev <veth_host> type veth peer name <veth_con>
-```
-
-### macvlan和macvtap设备
-```bash
-ip link add link <DEVICE> name <NAME> type macvlan [mode <MODE>]
-ip link add link <DEVICE> name <NAME> type macvtap [mode <MODE>]
-```
-
-#### mode属性
-|  mode | 作用 |
-|:-----|:-----|
-|private|在这种模式下，macvlan设备不能接受寄生在同一个物理网卡的其他macvlan设备的数据包，即使是其他macvlan设备通过物理网卡发送出去并通过hairpin设备返回的包|
-|vepa|在这种模式下，macvlan设备不能直接接受寄生在同一个物理网卡的其他macvlan设备的数据包，但是其他macvlan设备可以将数据包通过物理网卡发送出去，然后通过hairpin设备返回的给其他macvlan设备|
-|passthru|在这种模式下，每一个物理设备只能寄生一个macvlan设备|
-|bridge|在这种模式下，寄生在同一个物理设备的macvlan设备可以直接通讯，不需要外接的hairpin设备帮助|
-|source|在这种模式下，寄生在物理设备的这类macvlan设备，只能接受指定的源 mac source的数据包，其他数据包都不接受|
-
 ### ipvlan设备
 ```bash
 ip link add link <master-dev> <slave-dev> 
