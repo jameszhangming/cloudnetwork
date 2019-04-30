@@ -1,13 +1,13 @@
 # IP frag
 
-���ǵ�һ��skb�����ȴ��ڴ����豸������·�������豸��mtuʱ�������һ���ķ�ʽ�����и�Ӷ�ʹ���ĵ��Է��ͳ�ȥ������������Ҫ˵������Ƭ�ַ�ΪIP��TCP��Ƭ���֣�����tcp�������Լ��Ļ���ȥ��Ƭ������Ҫ����IP���Ƭ��������udp����icmp�ȱ��ģ�ֻ������IP��ȥ��Ƭ��
+就是当一个skb包长度大于传输设备或者链路上物理设备的mtu时，会根据一定的方式进行切割，从而使报文得以发送出去。但是这里需要说明，分片又分为IP和TCP分片两种，由于tcp报文有自己的机制去分片，不需要依赖IP层分片；而对于udp或者icmp等报文，只能依赖IP层去分片。
 
-��Ƭ��IP���ݱ����ܻ��Բ�ͬ��·�����䵽������������������ͨ��һϵ�е����飬���仹ԭΪһ��������IP���ݱ������ύ���ϲ�Э�鴦����
+分片的IP数据报可能会以不同的路径传输到接收主机，接收主机通过一系列的重组，将其还原为一个完整的IP数据报，再提交给上层协议处理。
 
 
-## ����������Ƭ��
+## 发包方向（切片）
 
-ip_finish_output�����У������Ĳ���GSO���ģ��ұ��ĳ��ȳ���MTUʱ����ҪIP��Ƭ�ٴ��ݸ��ھ���ϵͳ���з�����͡�
+ip_finish_output函数中，当报文不是GSO报文，且报文长度超过MTU时，需要IP切片再传递给邻居子系统进行封包发送。
 
 ```c
 int ip_fragment(struct sock *sk, struct sk_buff *skb,
@@ -278,9 +278,9 @@ fail:
 }
 ```
 
-## �հ��������飩
+## 收包方向（重组）
 
-ip_local_deliver�������жϱ����Ƿ�ΪIP��Ƭ���ģ����������з�Ƭ���顣
+ip_local_deliver函数会判断报文是否为IP分片报文，如果是则进行分片重组。
 
 ```c
 int ip_defrag(struct sk_buff *skb, u32 user)
