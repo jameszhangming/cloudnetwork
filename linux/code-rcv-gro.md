@@ -71,7 +71,7 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 }
 ```
 
-### 链路层GRO收包
+## 链路层GRO收包
 
 ```c
 static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
@@ -186,7 +186,12 @@ normal:
 	ret = GRO_NORMAL;
 	goto pull;
 }
+```
 
+
+### 链路层GRO complete
+
+```c
 static int napi_gro_complete(struct sk_buff *skb)
 {
 	struct packet_offload *ptype;
@@ -223,7 +228,7 @@ out:
 ```
 
 
-### IP层GRO收包
+## IP层GRO收包
 
 ```c
 static struct sk_buff **inet_gro_receive(struct sk_buff **head,
@@ -326,7 +331,11 @@ out:
 
 	return pp;
 }
+```
 
+### IP层GRO complete
+
+```c
 static int inet_gro_complete(struct sk_buff *skb, int nhoff)
 {
 	__be16 newlen = htons(skb->len - nhoff);
@@ -359,7 +368,7 @@ out_unlock:
 }
 ```
 
-### TCP层GRO收包
+## TCP层GRO收包
 
 ```c
 static struct sk_buff **tcp4_gro_receive(struct sk_buff **head, struct sk_buff *skb)
@@ -587,7 +596,12 @@ done:
 	NAPI_GRO_CB(skb)->same_flow = 1;	//same_flow置1，说明报文已经被合并到gro_list中
 	return 0;
 }
+```
 
+
+## TCP层GRO complete
+
+```c
 static int tcp4_gro_complete(struct sk_buff *skb, int thoff)
 {
 	const struct iphdr *iph = ip_hdr(skb);
@@ -617,14 +631,4 @@ int tcp_gro_complete(struct sk_buff *skb)
 	return 0;
 }
 ```
-
-
-
-
-
-
-
-
-
-
 
