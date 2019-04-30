@@ -368,7 +368,11 @@ static inline int sock_recvmsg_nosec(struct socket *sock, struct msghdr *msg,
 }
 ```
 
+
 ## Socket bind
+
+该函数把通过socket调用创建的套接字命名，从而让它可以被其他进程使用。对于AF_UNIX，调用该函数后套接字就会关联到一个文件系统路径名，对于AF_INET，则会关联到一个IP端口号。
+
 ```c
 SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
 {
@@ -396,6 +400,9 @@ SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
 
 
 ## Socket listen
+
+该函数用来创建一个队列来保存未处理的请求。
+
 ```c
 SYSCALL_DEFINE2(listen, int, fd, int, backlog)
 {
@@ -419,8 +426,102 @@ SYSCALL_DEFINE2(listen, int, fd, int, backlog)
 }
 ```
 
+## Socket accept
+
+该系统调用用来等待客户建立对该套接字的连接。accept系统调用只有当客户程序试图连接到由socket参数指定的套接字上时才返回，也就是说，如果套接字队列中没有未处理的连接，accept将阻塞直到有客户建立连接为止。accept函数将创建一个新套接字来与该客户进行通信，并且返回新套接字的描述符，新套接字的类型和服务器监听套接字类型是一样的。
+
+```c
+SYSCALL_DEFINE3(accept, int, fd, struct sockaddr __user *, upeer_sockaddr,
+		int __user *, upeer_addrlen)
+{
+	return sys_accept4(fd, upeer_sockaddr, upeer_addrlen, 0);
+}
+
+SYSCALL_DEFINE4(accept4, int, fd, struct sockaddr __user *, upeer_sockaddr,
+		int __user *, upeer_addrlen, int, flags)
+{
+	struct socket *sock, *newsock;
+	struct file *newfile;
+	int err, len, newfd, fput_needed;
+	struct sockaddr_storage address;
+
+	if (flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
+		return -EINVAL;
+
+	if (SOCK_NONBLOCK != O_NONBLOCK && (flags & SOCK_NONBLOCK))
+		flags = (flags & ~SOCK_NONBLOCK) | O_NONBLOCK;
+
+	sock = sockfd_lookup_light(fd, &err, &fput_needed);
+	if (!sock)
+		goto out;
+
+	err = -ENFILE;
+	newsock = sock_alloc();
+	if (!newsock)
+		goto out_put;
+
+	newsock->type = sock->type;
+	newsock->ops = sock->ops;
+
+	/*
+	 * We don't need try_module_get here, as the listening socket (sock)
+	 * has the protocol module (sock->ops->owner) held.
+	 */
+	__module_get(newsock->ops->owner);
+
+	newfd = get_unused_fd_flags(flags);
+	if (unlikely(newfd < 0)) {
+		err = newfd;
+		sock_release(newsock);
+		goto out_put;
+	}
+	newfile = sock_alloc_file(newsock, flags, sock->sk->sk_prot_creator->name);
+	if (unlikely(IS_ERR(newfile))) {
+		err = PTR_ERR(newfile);
+		put_unused_fd(newfd);
+		sock_release(newsock);
+		goto out_put;
+	}
+
+	err = security_socket_accept(sock, newsock);
+	if (err)
+		goto out_fd;
+
+	err = sock->ops->accept(sock, newsock, sock->file->f_flags);
+	if (err < 0)
+		goto out_fd;
+
+	if (upeer_sockaddr) {
+		if (newsock->ops->getname(newsock, (struct sockaddr *)&address,
+					  &len, 2) < 0) {
+			err = -ECONNABORTED;
+			goto out_fd;
+		}
+		err = move_addr_to_user(&address,
+					len, upeer_sockaddr, upeer_addrlen);
+		if (err < 0)
+			goto out_fd;
+	}
+
+	/* File flags are not inherited via accept() unlike another OSes. */
+
+	fd_install(newfd, newfile);
+	err = newfd;
+
+out_put:
+	fput_light(sock->file, fput_needed);
+out:
+	return err;
+out_fd:
+	fput(newfile);
+	put_unused_fd(newfd);
+	goto out_put;
+}
+```
+
 
 ## Socket connect
+
 ```c
 SYSCALL_DEFINE3(connect, int, fd, struct sockaddr __user *, uservaddr,
 		int, addrlen)
