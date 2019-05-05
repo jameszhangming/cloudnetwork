@@ -1,8 +1,8 @@
 # Socket File
 
-±¾ÎÄÒÔUDP SOCKETÎªÀý£¬·ÖÎösocketµÄfile²Ù×÷¡£
+æœ¬æ–‡ä»¥UDP SOCKETä¸ºä¾‹ï¼Œåˆ†æžsocketçš„fileæ“ä½œã€‚
 
-## Êý¾Ý½á¹¹
+## æ•°æ®ç»“æž„
 
 ```c
 static const struct file_operations socket_file_ops = {
@@ -133,7 +133,7 @@ static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_addres
 
 ## sock_def_readable
 
-sock_def_readableº¯ÊýÎªsocketÊÕ°üºó£¬»½ÐÑwait½ø³ÌµÄº¯Êý
+sock_def_readableå‡½æ•°ä¸ºsocketæ”¶åŒ…åŽï¼Œå”¤é†’waitè¿›ç¨‹çš„å‡½æ•°
 
 ```c
 static void sock_def_readable(struct sock *sk)
@@ -142,7 +142,7 @@ static void sock_def_readable(struct sock *sk)
 
 	rcu_read_lock();
 	wq = rcu_dereference(sk->sk_wq);
-	if (wq_has_sleeper(wq))   //wait¶ÓÁÐ²»Îª¿Õ
+	if (wq_has_sleeper(wq))   //waité˜Ÿåˆ—ä¸ä¸ºç©º
 		wake_up_interruptible_sync_poll(&wq->wait, POLLIN | POLLPRI |
 						POLLRDNORM | POLLRDBAND);
 	sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
@@ -174,7 +174,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 {
 	wait_queue_t *curr, *next;
 
-	list_for_each_entry_safe(curr, next, &q->task_list, task_list) {  //±éÀúËùÓÐµÈ´ý½ø³Ì
+	list_for_each_entry_safe(curr, next, &q->task_list, task_list) {  //éåŽ†æ‰€æœ‰ç­‰å¾…è¿›ç¨‹
 		unsigned flags = curr->flags;
 
 		if (curr->func(curr, mode, wake_flags, key) &&

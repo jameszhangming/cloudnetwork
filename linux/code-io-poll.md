@@ -1,36 +1,36 @@
 # poll
 
-Ê¹ÓÃPOLL»úÖÆ¿ÉÒÔ´¦Àí¶àÁ¬½Ó¡£
+ä½¿ç”¨POLLæœºåˆ¶å¯ä»¥å¤„ç†å¤šè¿žæŽ¥ã€‚
 
-pollº¯ÊýÊ¹ÓÃpollfdÀàÐÍµÄ½á¹¹À´¼à¿ØÒ»×éÎÄ¼þ¾ä±ú£¬ufdsÊÇÒª¼à¿ØµÄÎÄ¼þ¾ä±ú¼¯ºÏ£¬nfdsÊÇ¼à¿ØµÄÎÄ¼þ¾ä±úÊýÁ¿£¬timeoutÊÇµÈ´ýµÄºÁÃëÊý£¬Õâ¶ÎÊ±¼äÄÚÎÞÂÛI/OÊÇ·ñ×¼±¸ºÃ£¬poll¶¼»á·µ»Ø¡£timeoutÎª¸ºÊý±íÊ¾ÎÞÏßµÈ´ý£¬timeoutÎª0±íÊ¾µ÷ÓÃºóÁ¢¼´·µ»Ø¡£
+pollå‡½æ•°ä½¿ç”¨pollfdç±»åž‹çš„ç»“æž„æ¥ç›‘æŽ§ä¸€ç»„æ–‡ä»¶å¥æŸ„ï¼Œufdsæ˜¯è¦ç›‘æŽ§çš„æ–‡ä»¶å¥æŸ„é›†åˆï¼Œnfdsæ˜¯ç›‘æŽ§çš„æ–‡ä»¶å¥æŸ„æ•°é‡ï¼Œtimeoutæ˜¯ç­‰å¾…çš„æ¯«ç§’æ•°ï¼Œè¿™æ®µæ—¶é—´å†…æ— è®ºI/Oæ˜¯å¦å‡†å¤‡å¥½ï¼Œpolléƒ½ä¼šè¿”å›žã€‚timeoutä¸ºè´Ÿæ•°è¡¨ç¤ºæ— çº¿ç­‰å¾…ï¼Œtimeoutä¸º0è¡¨ç¤ºè°ƒç”¨åŽç«‹å³è¿”å›žã€‚
 
-Ö´ÐÐ½á¹û£º
+æ‰§è¡Œç»“æžœï¼š
 
-* 0±íÊ¾³¬Ê±Ç°Ã»ÓÐÈÎºÎÊÂ¼þ·¢Éú£»
-* -1±íÊ¾Ê§°Ü£»³É¹¦Ôò·µ»Ø½á¹¹ÌåÖÐrevents²»Îª0µÄÎÄ¼þÃèÊö·û¸öÊý¡£
+* 0è¡¨ç¤ºè¶…æ—¶å‰æ²¡æœ‰ä»»ä½•äº‹ä»¶å‘ç”Ÿï¼›
+* -1è¡¨ç¤ºå¤±è´¥ï¼›æˆåŠŸåˆ™è¿”å›žç»“æž„ä½“ä¸­reventsä¸ä¸º0çš„æ–‡ä»¶æè¿°ç¬¦ä¸ªæ•°ã€‚
  
-pollfd½á¹¹¼à¿ØµÄÊÂ¼þÀàÐÍÈçÏÂ£º
+pollfdç»“æž„ç›‘æŽ§çš„äº‹ä»¶ç±»åž‹å¦‚ä¸‹ï¼š
 ```c
-#define POLLIN 0x0001     //ÓÐÊý¾Ý¿É¶Á
-#define POLLPRI 0x0002    //ÓÐ½ôÆÈÊý¾Ý¿É¶Á
-#define POLLOUT 0x0004    //Ð´Êý¾Ý²»»áµ¼ÖÂ×èÈû
-#define POLLERR 0x0008    //Ö¸¶¨µÄÎÄ¼þÃèÊö·û·¢Éú´íÎó
-#define POLLHUP 0x0010    //Ö¸¶¨µÄÎÄ¼þÃèÊö·û¹ÒÆðÊÂ¼þ
-#define POLLNVAL 0x0020   //Ö¸¶¨µÄÎÄ¼þÃèÊö·û·Ç·¨
+#define POLLIN 0x0001     //æœ‰æ•°æ®å¯è¯»
+#define POLLPRI 0x0002    //æœ‰ç´§è¿«æ•°æ®å¯è¯»
+#define POLLOUT 0x0004    //å†™æ•°æ®ä¸ä¼šå¯¼è‡´é˜»å¡ž
+#define POLLERR 0x0008    //æŒ‡å®šçš„æ–‡ä»¶æè¿°ç¬¦å‘ç”Ÿé”™è¯¯
+#define POLLHUP 0x0010    //æŒ‡å®šçš„æ–‡ä»¶æè¿°ç¬¦æŒ‚èµ·äº‹ä»¶
+#define POLLNVAL 0x0020   //æŒ‡å®šçš„æ–‡ä»¶æè¿°ç¬¦éžæ³•
   
-#define POLLRDNORM 0x0040   //ÓÐÆÕÍ¨Êý¾Ý¿É¶Á
-#define POLLRDBAND 0x0080   //ÓÐÓÅÏÈÊý¾Ý¿É¶Á
-#define POLLWRNORM 0x0100   //Ð´ÆÕÍ¨Êý¾Ý²»»áµ¼ÖÂ×èÈû
-#define POLLWRBAND 0x0200   //Ð´ÓÅÏÈÊý¾Ý²»»áµ¼ÖÂ×èÈû
-#define POLLMSG 0x0400      //SIGPOLL ÏûÏ¢¿ÉÓÃ
+#define POLLRDNORM 0x0040   //æœ‰æ™®é€šæ•°æ®å¯è¯»
+#define POLLRDBAND 0x0080   //æœ‰ä¼˜å…ˆæ•°æ®å¯è¯»
+#define POLLWRNORM 0x0100   //å†™æ™®é€šæ•°æ®ä¸ä¼šå¯¼è‡´é˜»å¡ž
+#define POLLWRBAND 0x0200   //å†™ä¼˜å…ˆæ•°æ®ä¸ä¼šå¯¼è‡´é˜»å¡ž
+#define POLLMSG 0x0400      //SIGPOLL æ¶ˆæ¯å¯ç”¨
 #define POLLREMOVE 0x1000  
 #define POLLRDHUP 0x2000  
 ```
 
-POLLIN|POLLPRIÀàËÆÓÚselectµÄ¶ÁÊÂ¼þ£¬POLLOUT|POLLWRBANDÀàËÆÓÚselectµÄÐ´ÊÂ¼þ¡£
+POLLIN|POLLPRIç±»ä¼¼äºŽselectçš„è¯»äº‹ä»¶ï¼ŒPOLLOUT|POLLWRBANDç±»ä¼¼äºŽselectçš„å†™äº‹ä»¶ã€‚
 
 
-## ÏµÍ³½Ó¿Ú
+## ç³»ç»ŸæŽ¥å£
 
 ```c
 SYSCALL_DEFINE3(poll, struct pollfd __user *, ufds, unsigned int, nfds,
@@ -107,7 +107,7 @@ int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 		}
 	}
 
-	poll_initwait(&table);   //³õÊ¼»¯poll_wqueues£¬ÉèÖÃpoll_tableµÄ_qprocÎª__pollwait
+	poll_initwait(&table);   //åˆå§‹åŒ–poll_wqueuesï¼Œè®¾ç½®poll_tableçš„_qprocä¸º__pollwait
 	fdcount = do_poll(nfds, head, &table, end_time);
 	poll_freewait(&table);
 
@@ -193,7 +193,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 			if (signal_pending(current))
 				count = -EINTR;
 		}
-		if (count || timed_out)    //³¬Ê±»òÓÐfd´¦ÓÚready×´Ì¬
+		if (count || timed_out)    //è¶…æ—¶æˆ–æœ‰fdå¤„äºŽreadyçŠ¶æ€
 			break;
 
 		/* only if found POLL_BUSY_LOOP sockets && not out of time */
@@ -217,7 +217,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 			to = &expire;
 		}
 
-		if (!poll_schedule_timeout(wait, TASK_INTERRUPTIBLE, to, slack))  //Ö÷¶¯µ÷¶È
+		if (!poll_schedule_timeout(wait, TASK_INTERRUPTIBLE, to, slack))  //ä¸»åŠ¨è°ƒåº¦
 			timed_out = 1;
 	}
 	return count;
@@ -240,7 +240,7 @@ static inline unsigned int do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 			if (f.file->f_op->poll) {
 				pwait->_key = pollfd->events|POLLERR|POLLHUP;
 				pwait->_key |= busy_flag;
-				mask = f.file->f_op->poll(f.file, pwait);    //µ÷ÓÃfopsµÄpoll·½·¨£¬×îÖÕ»áµ÷ÓÃpwaitµÄ_qproc
+				mask = f.file->f_op->poll(f.file, pwait);    //è°ƒç”¨fopsçš„pollæ–¹æ³•ï¼Œæœ€ç»ˆä¼šè°ƒç”¨pwaitçš„_qproc
 				if (mask & busy_flag)
 					*can_busy_poll = true;
 			}
@@ -254,7 +254,7 @@ static inline unsigned int do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 	return mask;
 }
 
-//socket->f_op->poll×îÖÕ»áµ÷ÓÃpoll_tableµÄ_qproc£¬Êµ¼ÊÎª__pollwaitº¯Êý
+//socket->f_op->pollæœ€ç»ˆä¼šè°ƒç”¨poll_tableçš„_qprocï¼Œå®žé™…ä¸º__pollwaitå‡½æ•°
 static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
 				poll_table *p)
 {
@@ -265,9 +265,9 @@ static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
 	entry->filp = get_file(filp);
 	entry->wait_address = wait_address;
 	entry->key = p->_key;
-	init_waitqueue_func_entry(&entry->wait, pollwake); //³õÊ¼»¯µÈ´ýÏî
+	init_waitqueue_func_entry(&entry->wait, pollwake); //åˆå§‹åŒ–ç­‰å¾…é¡¹
 	entry->wait.private = pwq;
-	add_wait_queue(wait_address, &entry->wait);  //ÔÚµÈ´ý¶ÓÁÐÖÐ£¬Ìí¼ÓÏî
+	add_wait_queue(wait_address, &entry->wait);  //åœ¨ç­‰å¾…é˜Ÿåˆ—ä¸­ï¼Œæ·»åŠ é¡¹
 }
 ```
 
