@@ -1529,3 +1529,257 @@ int ip_send_skb(struct net *net, struct sk_buff *skb)
 }
 ```
 
+##  UDP Socket 接收报文
+
+```c
+int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
+		int flags, int *addr_len)
+{
+	struct inet_sock *inet = inet_sk(sk);
+	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
+	struct sk_buff *skb;
+	unsigned int ulen, copied;
+	int peeked, off = 0;
+	int err;
+	int is_udplite = IS_UDPLITE(sk);
+	bool slow;
+
+	if (flags & MSG_ERRQUEUE)
+		return ip_recv_error(sk, msg, len, addr_len);
+
+try_again:
+	skb = __skb_recv_datagram(sk, flags | (noblock ? MSG_DONTWAIT : 0),
+				  &peeked, &off, &err);
+	if (!skb)
+		goto out;
+
+	ulen = skb->len - sizeof(struct udphdr);
+	copied = len;
+	if (copied > ulen)
+		copied = ulen;
+	else if (copied < ulen)
+		msg->msg_flags |= MSG_TRUNC;
+
+	/*
+	 * If checksum is needed at all, try to do it while copying the
+	 * data.  If the data is truncated, or if we only want a partial
+	 * coverage checksum (UDP-Lite), do it before the copy.
+	 */
+
+	if (copied < ulen || UDP_SKB_CB(skb)->partial_cov) {
+		if (udp_lib_checksum_complete(skb))
+			goto csum_copy_err;
+	}
+
+	if (skb_csum_unnecessary(skb))
+		err = skb_copy_datagram_msg(skb, sizeof(struct udphdr),
+					    msg, copied);
+	else {
+		err = skb_copy_and_csum_datagram_msg(skb, sizeof(struct udphdr),
+						     msg);
+
+		if (err == -EINVAL)
+			goto csum_copy_err;
+	}
+
+	if (unlikely(err)) {
+		trace_kfree_skb(skb, udp_recvmsg);
+		if (!peeked) {
+			atomic_inc(&sk->sk_drops);
+			UDP_INC_STATS_USER(sock_net(sk),
+					   UDP_MIB_INERRORS, is_udplite);
+		}
+		goto out_free;
+	}
+
+	if (!peeked)
+		UDP_INC_STATS_USER(sock_net(sk),
+				UDP_MIB_INDATAGRAMS, is_udplite);
+
+	sock_recv_ts_and_drops(msg, sk, skb);
+
+	/* Copy the address. */
+	if (sin) {
+		sin->sin_family = AF_INET;
+		sin->sin_port = udp_hdr(skb)->source;
+		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
+		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+		*addr_len = sizeof(*sin);
+	}
+	if (inet->cmsg_flags)
+		ip_cmsg_recv_offset(msg, skb, sizeof(struct udphdr));
+
+	err = copied;
+	if (flags & MSG_TRUNC)
+		err = ulen;
+
+out_free:
+	skb_free_datagram_locked(sk, skb);
+out:
+	return err;
+
+csum_copy_err:
+	slow = lock_sock_fast(sk);
+	if (!skb_kill_datagram(sk, skb, flags)) {
+		UDP_INC_STATS_USER(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);
+		UDP_INC_STATS_USER(sock_net(sk), UDP_MIB_INERRORS, is_udplite);
+	}
+	unlock_sock_fast(sk, slow);
+
+	/* starting over for a new packet, but check if we need to yield */
+	cond_resched();
+	msg->msg_flags &= ~MSG_TRUNC;
+	goto try_again;
+}
+
+struct sk_buff *__skb_recv_datagram(struct sock *sk, unsigned int flags,
+				    int *peeked, int *off, int *err)
+{
+	struct sk_buff_head *queue = &sk->sk_receive_queue;
+	struct sk_buff *skb, *last;
+	unsigned long cpu_flags;
+	long timeo;
+	/*
+	 * Caller is allowed not to check sk->sk_err before skb_recv_datagram()
+	 */
+	int error = sock_error(sk);
+
+	if (error)
+		goto no_packet;
+
+	timeo = sock_rcvtimeo(sk, flags & MSG_DONTWAIT);
+
+	do {
+		/* Again only user level code calls this function, so nothing
+		 * interrupt level will suddenly eat the receive_queue.
+		 *
+		 * Look at current nfs client by the way...
+		 * However, this function was correct in any case. 8)
+		 */
+		int _off = *off;
+
+		last = (struct sk_buff *)queue;
+		spin_lock_irqsave(&queue->lock, cpu_flags);
+		skb_queue_walk(queue, skb) {
+			last = skb;
+			*peeked = skb->peeked;
+			if (flags & MSG_PEEK) {
+				if (_off >= skb->len && (skb->len || _off ||
+							 skb->peeked)) {
+					_off -= skb->len;
+					continue;
+				}
+
+				skb = skb_set_peeked(skb);
+				error = PTR_ERR(skb);
+				if (IS_ERR(skb))
+					goto unlock_err;
+
+				atomic_inc(&skb->users);
+			} else
+				__skb_unlink(skb, queue);
+
+			spin_unlock_irqrestore(&queue->lock, cpu_flags);
+			*off = _off;
+			return skb;
+		}
+		spin_unlock_irqrestore(&queue->lock, cpu_flags);
+
+		if (sk_can_busy_loop(sk) &&
+		    sk_busy_loop(sk, flags & MSG_DONTWAIT))
+			continue;
+
+		/* User doesn't want to wait */
+		error = -EAGAIN;
+		if (!timeo)
+			goto no_packet;
+
+	} while (!wait_for_more_packets(sk, err, &timeo, last));
+
+	return NULL;
+
+unlock_err:
+	spin_unlock_irqrestore(&queue->lock, cpu_flags);
+no_packet:
+	*err = error;
+	return NULL;
+}
+
+
+static int wait_for_more_packets(struct sock *sk, int *err, long *timeo_p,
+				 const struct sk_buff *skb)
+{
+	int error;
+	DEFINE_WAIT_FUNC(wait, receiver_wake_function);
+
+	prepare_to_wait_exclusive(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);  //添加到等待队列
+
+	/* Socket errors? */
+	error = sock_error(sk);
+	if (error)
+		goto out_err;
+
+	if (sk->sk_receive_queue.prev != skb)
+		goto out;
+
+	/* Socket shut down? */
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
+		goto out_noerr;
+
+	/* Sequenced packets can come disconnected.
+	 * If so we report the problem
+	 */
+	error = -ENOTCONN;
+	if (connection_based(sk) &&
+	    !(sk->sk_state == TCP_ESTABLISHED || sk->sk_state == TCP_LISTEN))
+		goto out_err;
+
+	/* handle signals */
+	if (signal_pending(current))
+		goto interrupted;
+
+	error = 0;
+	*timeo_p = schedule_timeout(*timeo_p);   //主动调度
+out:
+	finish_wait(sk_sleep(sk), &wait);
+	return error;
+interrupted:
+	error = sock_intr_errno(*timeo_p);
+out_err:
+	*err = error;
+	goto out;
+out_noerr:
+	*err = 0;
+	error = 1;
+	goto out;
+}
+
+static int receiver_wake_function(wait_queue_t *wait, unsigned int mode, int sync,
+				  void *key)
+{
+	unsigned long bits = (unsigned long)key;
+
+	/*
+	 * Avoid a wakeup if event not interesting for us
+	 */
+	if (bits && !(bits & (POLLIN | POLLERR)))
+		return 0;
+	return autoremove_wake_function(wait, mode, sync, key);
+}
+
+int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+	int ret = default_wake_function(wait, mode, sync, key);
+
+	if (ret)
+		list_del_init(&wait->task_list);
+	return ret;
+}
+
+int default_wake_function(wait_queue_t *curr, unsigned mode, int wake_flags,
+			  void *key)
+{
+	return try_to_wake_up(curr->private, mode, wake_flags);  //唤醒进程
+}
+```
+
