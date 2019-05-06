@@ -1,10 +1,10 @@
-# Netfilter×ÜÌå¿ò¼Ü
+# Netfilteræ€»ä½“æ¡†æ¶
 
-NetfilterÊÇLinux·À»ğÇ½µÄÄÚºËÊµÏÖ
+Netfilteræ˜¯Linuxé˜²ç«å¢™çš„å†…æ ¸å®ç°
 
-## Hookµã¶¨Òå
+## Hookç‚¹å®šä¹‰
 
-Netfilter ¹²¶¨ÒåÁË5¸öHookµã£º
+Netfilter å…±å®šä¹‰äº†5ä¸ªHookç‚¹ï¼š
 
 ```c
 enum nf_inet_hooks {
@@ -32,14 +32,14 @@ enum nf_inet_hooks {
 #define NF_BR_NUMHOOKS		6
 ```
 
-### HookµãÄÚºËÈë¿Ú
+### Hookç‚¹å†…æ ¸å…¥å£
 
-![netfilter-flow](images/netfilter-flow.png "netfilter-flow")
+![netfilter-flow](../images/netfilter-flow.png "netfilter-flow")
 
 
-## Hookº¯Êı×¢²á
+## Hookå‡½æ•°æ³¨å†Œ
 
-### NAT hookº¯Êı¶¨Òå
+### NAT hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
@@ -78,7 +78,7 @@ static struct nf_hook_ops nf_nat_ipv4_ops[] __read_mostly = {
 };
 ```
 
-### CT hookº¯Êı¶¨Òå
+### CT hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops ipv4_conntrack_ops[] __read_mostly = {
@@ -127,7 +127,7 @@ static struct nf_hook_ops ipv4_conntrack_ops[] __read_mostly = {
 };
 ```
 
-### defrag hookº¯Êı¶¨Òå
+### defrag hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops ipv4_defrag_ops[] = {
@@ -148,7 +148,7 @@ static struct nf_hook_ops ipv4_defrag_ops[] = {
 };
 ```
 
-### bridge hookº¯Êı¶¨Òå
+### bridge hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops br_nf_ops[] __read_mostly = {
@@ -204,7 +204,7 @@ static struct nf_hook_ops br_nf_ops[] __read_mostly = {
 };
 ```
 
-### ebtable hookº¯Êı¶¨Òå
+### ebtable hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops ebt_ops_filter[] __read_mostly = {
@@ -232,7 +232,7 @@ static struct nf_hook_ops ebt_ops_filter[] __read_mostly = {
 };
 ```
 
-### ebtable nat hookº¯Êı¶¨Òå
+### ebtable nat hookå‡½æ•°å®šä¹‰
 
 ```c
 static struct nf_hook_ops ebt_ops_nat[] __read_mostly = {
@@ -260,7 +260,7 @@ static struct nf_hook_ops ebt_ops_nat[] __read_mostly = {
 };
 ```
 
-### ¹«¹²Hookº¯Êı¶¨Òå
+### å…¬å…±Hookå‡½æ•°å®šä¹‰
 
 ```c
 #define FILTER_VALID_HOOKS ((1 << NF_INET_LOCAL_IN) | \
@@ -329,7 +329,7 @@ xt_hook_link(&packet_filter, arptable_filter_hook);
 ```
 
 
-### Hookº¯Êı×¢²á
+### Hookå‡½æ•°æ³¨å†Œ
 
 ```c
 int nf_register_hooks(struct nf_hook_ops *reg, unsigned int n)
@@ -355,11 +355,11 @@ int nf_register_hook(struct nf_hook_ops *reg)
 	struct nf_hook_ops *elem;
 
 	mutex_lock(&nf_hook_mutex);
-	list_for_each_entry(elem, &nf_hooks[reg->pf][reg->hooknum], list) {  //nf_hooksÎª¶şÎ¬Ö¸ÕëÊı¾İ£¬Ã¿ÖÖĞ­Òé8¸öhookµã
+	list_for_each_entry(elem, &nf_hooks[reg->pf][reg->hooknum], list) {  //nf_hooksä¸ºäºŒç»´æŒ‡é’ˆæ•°æ®ï¼Œæ¯ç§åè®®8ä¸ªhookç‚¹
 		if (reg->priority < elem->priority)
 			break;
 	}
-	list_add_rcu(&reg->list, elem->list.prev);		//Á´±í°´ÕÕÓÅÏÈ¼¶ÅÅĞò
+	list_add_rcu(&reg->list, elem->list.prev);		//é“¾è¡¨æŒ‰ç…§ä¼˜å…ˆçº§æ’åº
 	mutex_unlock(&nf_hook_mutex);
 #ifdef HAVE_JUMP_LABEL
 	static_key_slow_inc(&nf_hooks_needed[reg->pf][reg->hooknum]);
@@ -369,51 +369,51 @@ int nf_register_hook(struct nf_hook_ops *reg)
 ```
 
 
-## Netfilter Hookµã×Ü½á
+## Netfilter Hookç‚¹æ€»ç»“
 
-CTÏà¹ØµÄHookµã£¬ÔÚNF_INET_PRE_ROUTING¡¢NF_INET_LOCAL_IN¡¢NF_INET_LOCAL_OUTºÍNF_INET_POST_ROUTINGÕâËÄ¸öµã¡£
+CTç›¸å…³çš„Hookç‚¹ï¼Œåœ¨NF_INET_PRE_ROUTINGã€NF_INET_LOCAL_INã€NF_INET_LOCAL_OUTå’ŒNF_INET_POST_ROUTINGè¿™å››ä¸ªç‚¹ã€‚
 
-ÒÔÏÂÁĞ³öµÄ¸÷¸öhookµã£¬°´ÕÕhookº¯ÊıµÄÓÅÏÈ¼¶ÅÅĞò£¬Êı×ÖÔ½Ğ¡´ú±íÓÅÏÈ¼¶Ô½¸ß£º
+ä»¥ä¸‹åˆ—å‡ºçš„å„ä¸ªhookç‚¹ï¼ŒæŒ‰ç…§hookå‡½æ•°çš„ä¼˜å…ˆçº§æ’åºï¼Œæ•°å­—è¶Šå°ä»£è¡¨ä¼˜å…ˆçº§è¶Šé«˜ï¼š
 
 ```c
 NF_INET_PRE_ROUTING
-ipv4_conntrack_defrag£¨NF_IP_PRI_CONNTRACK_DEFRAG£º-400£©
-NF_IP_PRI_RAW£º-300   //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-ipv4_conntrack_in£¨NF_IP_PRI_CONNTRACK£º-200£©
-NF_IP_PRI_MANGLE£º-150  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-iptable_nat_ipv4_in£¨NF_IP_PRI_NAT_DST£º-100£©
-NF_IP_PRI_NAT_DST£º-100  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-NF_IP_PRI_FILTER£º0  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
+ipv4_conntrack_defragï¼ˆNF_IP_PRI_CONNTRACK_DEFRAGï¼š-400ï¼‰
+NF_IP_PRI_RAWï¼š-300   //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+ipv4_conntrack_inï¼ˆNF_IP_PRI_CONNTRACKï¼š-200ï¼‰
+NF_IP_PRI_MANGLEï¼š-150  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+iptable_nat_ipv4_inï¼ˆNF_IP_PRI_NAT_DSTï¼š-100ï¼‰
+NF_IP_PRI_NAT_DSTï¼š-100  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+NF_IP_PRI_FILTERï¼š0  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
 
 NF_INET_LOCAL_IN
-NF_IP_PRI_RAW£º-300  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-NF_IP_PRI_MANGLE£º-150  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-NF_IP_PRI_FILTER£º0  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-NF_IP_PRI_NAT_SRC£º100  //ÓÃ»§¿ÉÌí¼Ó¹æÔò
-iptable_nat_ipv4_fn£¨NF_IP_PRI_NAT_SRC£º100£©
-ipv4_helper£¨NF_IP_PRI_CONNTRACK_HELPER£º300£©
-ipv4_confirm£¨NF_IP_PRI_CONNTRACK_CONFIRM£ºMAX£©
+NF_IP_PRI_RAWï¼š-300  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+NF_IP_PRI_MANGLEï¼š-150  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+NF_IP_PRI_FILTERï¼š0  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+NF_IP_PRI_NAT_SRCï¼š100  //ç”¨æˆ·å¯æ·»åŠ è§„åˆ™
+iptable_nat_ipv4_fnï¼ˆNF_IP_PRI_NAT_SRCï¼š100ï¼‰
+ipv4_helperï¼ˆNF_IP_PRI_CONNTRACK_HELPERï¼š300ï¼‰
+ipv4_confirmï¼ˆNF_IP_PRI_CONNTRACK_CONFIRMï¼šMAXï¼‰
 
 NF_INET_LOCAL_OUT
-ipv4_conntrack_defrag£¨NF_IP_PRI_CONNTRACK_DEFRAG£º-400£©
-NF_IP_PRI_RAW£º-300
-ipv4_conntrack_local£¨NF_IP_PRI_CONNTRACK£º-200£©
-NF_IP_PRI_MANGLE£º-150
-iptable_nat_ipv4_local_fn£¨NF_IP_PRI_NAT_DST£º-100£©
-NF_IP_PRI_NAT_DST£º-100
-NF_IP_PRI_FILTER£º0
+ipv4_conntrack_defragï¼ˆNF_IP_PRI_CONNTRACK_DEFRAGï¼š-400ï¼‰
+NF_IP_PRI_RAWï¼š-300
+ipv4_conntrack_localï¼ˆNF_IP_PRI_CONNTRACKï¼š-200ï¼‰
+NF_IP_PRI_MANGLEï¼š-150
+iptable_nat_ipv4_local_fnï¼ˆNF_IP_PRI_NAT_DSTï¼š-100ï¼‰
+NF_IP_PRI_NAT_DSTï¼š-100
+NF_IP_PRI_FILTERï¼š0
 
 NF_INET_POST_ROUTING
-NF_IP_PRI_RAW£º-300
-NF_IP_PRI_MANGLE£º-150
-NF_IP_PRI_FILTER£º0
-NF_IP_PRI_NAT_SRC£º100
-iptable_nat_ipv4_out£¨NF_IP_PRI_NAT_SRC£º100£©
-ipv4_helper£¨NF_IP_PRI_CONNTRACK_HELPER:300£©
-ipv4_confirm£¨NF_IP_PRI_CONNTRACK_CONFIRM£ºMAX£©
+NF_IP_PRI_RAWï¼š-300
+NF_IP_PRI_MANGLEï¼š-150
+NF_IP_PRI_FILTERï¼š0
+NF_IP_PRI_NAT_SRCï¼š100
+iptable_nat_ipv4_outï¼ˆNF_IP_PRI_NAT_SRCï¼š100ï¼‰
+ipv4_helperï¼ˆNF_IP_PRI_CONNTRACK_HELPER:300ï¼‰
+ipv4_confirmï¼ˆNF_IP_PRI_CONNTRACK_CONFIRMï¼šMAXï¼‰
 ```
 
-## Netfilter Hookº¯ÊıÈë¿Ú
+## Netfilter Hookå‡½æ•°å…¥å£
 
 ```c
 static inline int
@@ -432,7 +432,7 @@ NF_HOOK_THRESH(uint8_t pf, unsigned int hook, struct sock *sk,
 {
 	int ret = nf_hook_thresh(pf, hook, sk, skb, in, out, okfn, thresh);
 	if (ret == 1)
-		ret = okfn(sk, skb);	//nf_hook_thresh·µ»Ø1ÄÜ¹»¼ÌĞø½»ÓÉokfnº¯Êı´¦Àí
+		ret = okfn(sk, skb);	//nf_hook_threshè¿”å›1èƒ½å¤Ÿç»§ç»­äº¤ç”±okfnå‡½æ•°å¤„ç†
 	return ret;
 }
 
@@ -462,10 +462,10 @@ static inline int nf_hook_thresh(u_int8_t pf, unsigned int hook,
 				 int (*okfn)(struct sock *, struct sk_buff *),
 				 int thresh)
 {
-	if (nf_hooks_active(pf, hook)) {    //¸ÃĞ­ÒéµÄhook×¢²áÁË·½·¨
+	if (nf_hooks_active(pf, hook)) {    //è¯¥åè®®çš„hookæ³¨å†Œäº†æ–¹æ³•
 		struct nf_hook_state state;
 
-		nf_hook_state_init(&state, hook, thresh, pf,   //³õÊ¼»¯state
+		nf_hook_state_init(&state, hook, thresh, pf,   //åˆå§‹åŒ–state
 				   indev, outdev, sk, okfn);
 		return nf_hook_slow(skb, &state);
 	}
@@ -485,10 +485,10 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state)
 	/* We may already have this, but read-locks nest anyway */
 	rcu_read_lock();
 
-	elem = list_entry_rcu(&nf_hooks[state->pf][state->hook],    //µÃµ½µÚÒ»¸öhookº¯Êı
+	elem = list_entry_rcu(&nf_hooks[state->pf][state->hook],    //å¾—åˆ°ç¬¬ä¸€ä¸ªhookå‡½æ•°
 			      struct nf_hook_ops, list);
 next_hook:
-	verdict = nf_iterate(&nf_hooks[state->pf][state->hook], skb, state,  //±éÀúËùÓĞµÄhookº¯Êı£¬Ö±µ½½áÊø»ò·Çaccept
+	verdict = nf_iterate(&nf_hooks[state->pf][state->hook], skb, state,  //éå†æ‰€æœ‰çš„hookå‡½æ•°ï¼Œç›´åˆ°ç»“æŸæˆ–éaccept
 			     &elem);
 	if (verdict == NF_ACCEPT || verdict == NF_STOP) {
 		ret = 1;
@@ -531,7 +531,7 @@ unsigned int nf_iterate(struct list_head *head,
 		/* Optimization: we don't need to hold module
 		   reference here, since function can't sleep. --RR */
 repeat:
-		verdict = (*elemp)->hook(*elemp, skb, state);	//µ÷ÓÃhookº¯Êı£¬Ö±µ½·Çaccept»ò½áÊø
+		verdict = (*elemp)->hook(*elemp, skb, state);	//è°ƒç”¨hookå‡½æ•°ï¼Œç›´åˆ°éacceptæˆ–ç»“æŸ
 		if (verdict != NF_ACCEPT) {
 #ifdef CONFIG_NETFILTER_DEBUG
 			if (unlikely((verdict & NF_VERDICT_MASK)
@@ -546,7 +546,7 @@ repeat:
 			goto repeat;
 		}
 	}
-	return NF_ACCEPT;   //±éÀú½áÊø
+	return NF_ACCEPT;   //éå†ç»“æŸ
 }
 ```
 
