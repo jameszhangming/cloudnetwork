@@ -107,7 +107,9 @@ int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 		}
 	}
 
-	poll_initwait(&table);   //初始化poll_wqueues，设置poll_table的_qproc为__pollwait
+	//初始化poll_wqueues，设置poll_table的_qproc为__pollwait
+	// 当前进程设置到polling_task成员
+	poll_initwait(&table);   
 	fdcount = do_poll(nfds, head, &table, end_time);
 	poll_freewait(&table);
 
@@ -240,7 +242,7 @@ static inline unsigned int do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 			if (f.file->f_op->poll) {
 				pwait->_key = pollfd->events|POLLERR|POLLHUP;
 				pwait->_key |= busy_flag;
-				mask = f.file->f_op->poll(f.file, pwait);    //调用fops的poll方法，最终会调用pwait的_qproc
+				mask = f.file->f_op->poll(f.file, pwait);    //以UDP socket为例，则调用udp_poll函数
 				if (mask & busy_flag)
 					*can_busy_poll = true;
 			}
@@ -253,8 +255,89 @@ static inline unsigned int do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 
 	return mask;
 }
+```
 
-//socket->f_op->poll最终会调用poll_table的_qproc，实际为__pollwait函数
+
+### UDP socket poll
+
+```c
+unsigned int udp_poll(struct file *file, struct socket *sock, poll_table *wait)
+{
+	unsigned int mask = datagram_poll(file, sock, wait);
+	struct sock *sk = sock->sk;
+
+	sock_rps_record_flow(sk);
+
+	/* Check for false positives due to checksum errors */
+	if ((mask & POLLRDNORM) && !(file->f_flags & O_NONBLOCK) &&
+	    !(sk->sk_shutdown & RCV_SHUTDOWN) && !first_packet_length(sk))
+		mask &= ~(POLLIN | POLLRDNORM);
+
+	return mask;
+
+}
+
+unsigned int datagram_poll(struct file *file, struct socket *sock,
+			   poll_table *wait)
+{
+	struct sock *sk = sock->sk;
+	unsigned int mask;
+
+	sock_poll_wait(file, sk_sleep(sk), wait);
+	mask = 0;
+
+	/* exceptional events? */
+	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue))
+		mask |= POLLERR |
+			(sock_flag(sk, SOCK_SELECT_ERR_QUEUE) ? POLLPRI : 0);
+
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
+		mask |= POLLRDHUP | POLLIN | POLLRDNORM;
+	if (sk->sk_shutdown == SHUTDOWN_MASK)
+		mask |= POLLHUP;
+
+	/* readable? */
+	if (!skb_queue_empty(&sk->sk_receive_queue))
+		mask |= POLLIN | POLLRDNORM;
+
+	/* Connection-based need to check for termination and startup */
+	if (connection_based(sk)) {
+		if (sk->sk_state == TCP_CLOSE)
+			mask |= POLLHUP;
+		/* connection hasn't started yet? */
+		if (sk->sk_state == TCP_SYN_SENT)
+			return mask;
+	}
+
+	/* writable? */
+	if (sock_writeable(sk))
+		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+	else
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
+
+	return mask;
+}
+
+static inline void sock_poll_wait(struct file *filp,
+		wait_queue_head_t *wait_address, poll_table *p)
+{
+	if (!poll_does_not_wait(p) && wait_address) {
+		poll_wait(filp, wait_address, p);
+		/* We need to be sure we are in sync with the
+		 * socket flags modification.
+		 *
+		 * This memory barrier is paired in the wq_has_sleeper.
+		 */
+		smp_mb();
+	}
+}
+
+static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
+{
+	if (p && p->_qproc && wait_address)
+		p->_qproc(filp, wait_address, p);    //实际为__pollwait函数
+}
+
 static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
 				poll_table *p)
 {
@@ -268,6 +351,49 @@ static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
 	init_waitqueue_func_entry(&entry->wait, pollwake); //初始化等待项
 	entry->wait.private = pwq;
 	add_wait_queue(wait_address, &entry->wait);  //在等待队列中，添加项
+}
+```
+
+
+### pollwake(poll_table回调函数)
+
+
+```c
+static int pollwake(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+	struct poll_table_entry *entry;
+
+	entry = container_of(wait, struct poll_table_entry, wait);
+	if (key && !((unsigned long)key & entry->key))
+		return 0;
+	return __pollwake(wait, mode, sync, key);
+}
+
+static int __pollwake(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+	struct poll_wqueues *pwq = wait->private;
+	// 初始化dummy_wait，dummy_wait的private设置为pwq->polling_task
+	DECLARE_WAITQUEUE(dummy_wait, pwq->polling_task);   
+
+	/*
+	 * Although this function is called under waitqueue lock, LOCK
+	 * doesn't imply write barrier and the users expect write
+	 * barrier semantics on wakeup functions.  The following
+	 * smp_wmb() is equivalent to smp_wmb() in try_to_wake_up()
+	 * and is paired with set_mb() in poll_schedule_timeout.
+	 */
+	smp_wmb();
+	pwq->triggered = 1;
+
+	/*
+	 * Perform the default wake up operation using a dummy
+	 * waitqueue.
+	 *
+	 * TODO: This is hacky but there currently is no interface to
+	 * pass in @sync.  @sync is scheduled to be removed and once
+	 * that happens, wake_up_process() can be used directly.
+	 */
+	return default_wake_function(&dummy_wait, mode, sync, key);   //唤醒阻塞的进程，即调用poll函数的进程，多个fd唤醒同一个进程
 }
 ```
 
