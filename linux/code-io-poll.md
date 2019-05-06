@@ -162,7 +162,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 		struct poll_list *walk;
 		bool can_busy_loop = false;
 
-		for (walk = list; walk != NULL; walk = walk->next) {
+		for (walk = list; walk != NULL; walk = walk->next) {  //每次从头开始遍历
 			struct pollfd * pfd, * pfd_end;
 
 			pfd = walk->entries;
@@ -178,7 +178,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 				if (do_pollfd(pfd, pt, &can_busy_loop,
 					      busy_flag)) {
 					count++;
-					pt->_qproc = NULL;
+					pt->_qproc = NULL;   // 下次执行do_pollfd不会把当前进程添加到等待队列中
 					/* found something, stop busy polling */
 					busy_flag = 0;
 					can_busy_loop = false;

@@ -9,18 +9,41 @@ epoll工作模式:
 * ET模式（Edge Triggered，边缘触发）
   * 该模式是一种高速处理模式，当且仅当状态发生变化时才会获得通知。在该模式下，其假定开发者在接收到一次通知后，会完整地处理该事件，因此内核将不再通知这一事件。注意，缓冲区中还有未处理的数据不能说是状态变化，因此，在ET模式下，开发者如果只读取了一部分数据，其将再也得不到通知了。正确的做法是，开发者自己确认读完了所有的字节（一直调用read/write直到出错EAGAGIN为止）。
 
+  
+## select/poll/epoll对比
 
-## 系统接口
+* select
+  * 支持多个socket
+  * 使用bit位置来表示fd
+  * 支持立即返回/超时/无限等待
+  * 进程唤醒时，按数组顺序逐个fd遍历确认
+* poll
+  * 支持多个socket
+  * 直接使用fd
+  * 支持立即返回/超时/无限等待
+  * 进程唤醒时，按数组顺序逐个fd遍历确认
+* epoll
+  * 支持多个socket
+  * 直接使用fd
+  * 支持立即返回/超时/无限等待
+  * 进程唤醒时，知道是哪个fd，当fd数量多时性能比较好
+
+
+## 数据结构
+
+![epoll-class](images/epoll-class.png "epoll-class")
 
 ```c
-#include <sys/epoll.h>
+static const struct file_operations eventpoll_fops = {
+#ifdef CONFIG_PROC_FS
+	.show_fdinfo	= ep_show_fdinfo,
+#endif
+	.release	= ep_eventpoll_release,
+	.poll		= ep_eventpoll_poll,
+	.llseek		= noop_llseek,
+};
+``` 
 
-int epoll_create(int size);
-
-int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
-
-int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
-```
 
 ## 模块初始化
 
@@ -66,6 +89,7 @@ static int __init eventpoll_init(void)
 	return 0;
 }
 ```
+
 
 ## epoll_create
 
@@ -342,7 +366,7 @@ static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
 
 	/* Initialize the poll table using the queue callback */
 	epq.epi = epi;
-	init_poll_funcptr(&epq.pt, ep_ptable_queue_proc);
+	init_poll_funcptr(&epq.pt, ep_ptable_queue_proc);  //初始化poll_table
 
 	/*
 	 * Attach the item to the poll hooks and get current event bits.
@@ -463,7 +487,6 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
 fd唤醒等待队列时，会调用此函数，该函数是在调用epoll_ctl函数时注册的。
 
 ```c
-
 static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *key)
 {
 	int pwake = 0;
@@ -536,7 +559,7 @@ static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *k
 	 */
 	if (waitqueue_active(&ep->wq))
 		wake_up_locked(&ep->wq);    //唤醒等待ep的队列，即调用epoll_wait的进程
-	if (waitqueue_active(&ep->poll_wait))
+	if (waitqueue_active(&ep->poll_wait))  //调用epoll的fops的poll函数时会添加该等待队列
 		pwake++;
 
 out_unlock:
@@ -624,7 +647,7 @@ static int ep_poll(struct eventpoll *ep, struct epoll_event __user *events,
 fetch_events:
 	spin_lock_irqsave(&ep->lock, flags);
 
-	if (!ep_events_available(ep)) {     //ready链表为空
+	if (!ep_events_available(ep)) {     //ready链表为空，直接返回
 		/*
 		 * We don't have any available event to return to the caller.
 		 * We need to sleep here, and we will be wake up by
@@ -648,13 +671,14 @@ fetch_events:
 			}
 
 			spin_unlock_irqrestore(&ep->lock, flags);
-			if (!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS))  //休眠直到超时
+			//休眠直到超时，如果未制定超时时间，则该函数返回为非0
+			if (!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS))  
 				timed_out = 1;
 
 			spin_lock_irqsave(&ep->lock, flags);
 		}
 
-		__remove_wait_queue(&ep->wq, &wait);
+		__remove_wait_queue(&ep->wq, &wait);  //返回时从当前等待队列中删除当前进程
 		__set_current_state(TASK_RUNNING);
 	}
 check_events:
@@ -669,7 +693,7 @@ check_events:
 	 * more luck.
 	 */
 	if (!res && eavail &&
-	    !(res = ep_send_events(ep, events, maxevents)) && !timed_out)
+	    !(res = ep_send_events(ep, events, maxevents)) && !timed_out)   //处理ready list
 		goto fetch_events;
 
 	return res;
