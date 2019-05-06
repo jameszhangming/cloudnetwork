@@ -71,6 +71,74 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 }
 ```
 
+
+### napi完成
+
+```c
+static inline void napi_complete(struct napi_struct *n)
+{
+	return napi_complete_done(n, 0);
+}
+
+void napi_complete_done(struct napi_struct *n, int work_done)
+{
+	unsigned long flags;
+
+	/*
+	 * don't let napi dequeue from the cpu poll list
+	 * just in case its running on a different cpu
+	 */
+	if (unlikely(test_bit(NAPI_STATE_NPSVC, &n->state)))
+		return;
+
+	if (n->gro_list) {
+		unsigned long timeout = 0;
+
+		if (work_done)
+			timeout = n->dev->gro_flush_timeout;
+
+		if (timeout)
+			hrtimer_start(&n->timer, ns_to_ktime(timeout),
+				      HRTIMER_MODE_REL_PINNED);
+		else
+			napi_gro_flush(n, false);
+	}
+	if (likely(list_empty(&n->poll_list))) {
+		WARN_ON_ONCE(!test_and_clear_bit(NAPI_STATE_SCHED, &n->state));
+	} else {
+		/* If n->poll_list is not empty, we need to mask irqs */
+		local_irq_save(flags);
+		__napi_complete(n);
+		local_irq_restore(flags);
+	}
+}
+
+void napi_gro_flush(struct napi_struct *napi, bool flush_old)
+{
+	struct sk_buff *skb, *prev = NULL;
+
+	/* scan list and build reverse chain */
+	for (skb = napi->gro_list; skb != NULL; skb = skb->next) {
+		skb->prev = prev;
+		prev = skb;
+	}
+
+	for (skb = prev; skb; skb = prev) {
+		skb->next = NULL;
+
+		if (flush_old && NAPI_GRO_CB(skb)->age == jiffies)
+			return;
+
+		prev = skb->prev;
+		napi_gro_complete(skb);
+		napi->gro_count--;
+	}
+
+	napi->gro_list = NULL;
+}
+```
+
+
 ## 链路层GRO收包
 
 ```c
