@@ -507,6 +507,228 @@ xfrm_resolve_and_create_bundle(struct xfrm_policy **pols, int num_pols,
 }
 ```
 
+### xfrm_tmpl_resolve
+
+```c
+static int
+xfrm_tmpl_resolve(struct xfrm_policy **pols, int npols, const struct flowi *fl,
+		  struct xfrm_state **xfrm, unsigned short family)
+{
+	struct xfrm_state *tp[XFRM_MAX_DEPTH];
+	struct xfrm_state **tpp = (npols > 1) ? tp : xfrm;
+	int cnx = 0;
+	int error;
+	int ret;
+	int i;
+
+	for (i = 0; i < npols; i++) {
+		if (cnx + pols[i]->xfrm_nr >= XFRM_MAX_DEPTH) {
+			error = -ENOBUFS;
+			goto fail;
+		}
+
+		ret = xfrm_tmpl_resolve_one(pols[i], fl, &tpp[cnx], family);
+		if (ret < 0) {
+			error = ret;
+			goto fail;
+		} else
+			cnx += ret;
+	}
+
+	/* found states are sorted for outbound processing */
+	if (npols > 1)
+		xfrm_state_sort(xfrm, tpp, cnx, family);
+
+	return cnx;
+
+ fail:
+	for (cnx--; cnx >= 0; cnx--)
+		xfrm_state_put(tpp[cnx]);
+	return error;
+
+}
+
+
+static int
+xfrm_tmpl_resolve_one(struct xfrm_policy *policy, const struct flowi *fl,
+		      struct xfrm_state **xfrm, unsigned short family)
+{
+	struct net *net = xp_net(policy);
+	int nx;
+	int i, error;
+	xfrm_address_t *daddr = xfrm_flowi_daddr(fl, family);
+	xfrm_address_t *saddr = xfrm_flowi_saddr(fl, family);
+	xfrm_address_t tmp;
+
+	for (nx = 0, i = 0; i < policy->xfrm_nr; i++) {
+		struct xfrm_state *x;
+		xfrm_address_t *remote = daddr;
+		xfrm_address_t *local  = saddr;
+		struct xfrm_tmpl *tmpl = &policy->xfrm_vec[i];
+
+		if (tmpl->mode == XFRM_MODE_TUNNEL ||
+		    tmpl->mode == XFRM_MODE_BEET) {
+			remote = &tmpl->id.daddr;
+			local = &tmpl->saddr;
+			if (xfrm_addr_any(local, tmpl->encap_family)) {
+				error = xfrm_get_saddr(net, &tmp, remote, tmpl->encap_family);
+				if (error)
+					goto fail;
+				local = &tmp;
+			}
+		}
+		
+		//查找xfrm_state对象
+		x = xfrm_state_find(remote, local, fl, tmpl, policy, &error, family);
+
+		if (x && x->km.state == XFRM_STATE_VALID) {
+			xfrm[nx++] = x;
+			daddr = remote;
+			saddr = local;
+			continue;
+		}
+		if (x) {
+			error = (x->km.state == XFRM_STATE_ERROR ?
+				 -EINVAL : -EAGAIN);
+			xfrm_state_put(x);
+		} else if (error == -ESRCH) {
+			error = -EAGAIN;
+		}
+
+		if (!tmpl->optional)
+			goto fail;
+	}
+	return nx;
+
+fail:
+	for (nx--; nx >= 0; nx--)
+		xfrm_state_put(xfrm[nx]);
+	return error;
+}
+
+
+struct xfrm_state *
+xfrm_state_find(const xfrm_address_t *daddr, const xfrm_address_t *saddr,
+		const struct flowi *fl, struct xfrm_tmpl *tmpl,
+		struct xfrm_policy *pol, int *err,
+		unsigned short family)
+{
+	static xfrm_address_t saddr_wildcard = { };
+	struct net *net = xp_net(pol);
+	unsigned int h, h_wildcard;
+	struct xfrm_state *x, *x0, *to_put;
+	int acquire_in_progress = 0;
+	int error = 0;
+	struct xfrm_state *best = NULL;
+	u32 mark = pol->mark.v & pol->mark.m;
+	unsigned short encap_family = tmpl->encap_family;
+	struct km_event c;
+
+	to_put = NULL;
+
+	spin_lock_bh(&net->xfrm.xfrm_state_lock);
+	h = xfrm_dst_hash(net, daddr, saddr, tmpl->reqid, encap_family);
+	hlist_for_each_entry(x, net->xfrm.state_bydst+h, bydst) {
+		if (x->props.family == encap_family &&
+		    x->props.reqid == tmpl->reqid &&
+		    (mark & x->mark.m) == x->mark.v &&
+		    !(x->props.flags & XFRM_STATE_WILDRECV) &&
+		    xfrm_state_addr_check(x, daddr, saddr, encap_family) &&
+		    tmpl->mode == x->props.mode &&
+		    tmpl->id.proto == x->id.proto &&
+		    (tmpl->id.spi == x->id.spi || !tmpl->id.spi))
+			xfrm_state_look_at(pol, x, fl, encap_family,
+					   &best, &acquire_in_progress, &error);
+	}
+	if (best || acquire_in_progress)
+		goto found;
+
+	h_wildcard = xfrm_dst_hash(net, daddr, &saddr_wildcard, tmpl->reqid, encap_family);
+	hlist_for_each_entry(x, net->xfrm.state_bydst+h_wildcard, bydst) {
+		if (x->props.family == encap_family &&
+		    x->props.reqid == tmpl->reqid &&
+		    (mark & x->mark.m) == x->mark.v &&
+		    !(x->props.flags & XFRM_STATE_WILDRECV) &&
+		    xfrm_addr_equal(&x->id.daddr, daddr, encap_family) &&
+		    tmpl->mode == x->props.mode &&
+		    tmpl->id.proto == x->id.proto &&
+		    (tmpl->id.spi == x->id.spi || !tmpl->id.spi))
+			xfrm_state_look_at(pol, x, fl, encap_family,
+					   &best, &acquire_in_progress, &error);
+	}
+
+found:
+	x = best;
+	if (!x && !error && !acquire_in_progress) {
+		if (tmpl->id.spi &&
+		    (x0 = __xfrm_state_lookup(net, mark, daddr, tmpl->id.spi,
+					      tmpl->id.proto, encap_family)) != NULL) {
+			to_put = x0;
+			error = -EEXIST;
+			goto out;
+		}
+
+		c.net = net;
+		/* If the KMs have no listeners (yet...), avoid allocating an SA
+		 * for each and every packet - garbage collection might not
+		 * handle the flood.
+		 */
+		if (!km_is_alive(&c)) {
+			error = -ESRCH;
+			goto out;
+		}
+
+		x = xfrm_state_alloc(net);
+		if (x == NULL) {
+			error = -ENOMEM;
+			goto out;
+		}
+		/* Initialize temporary state matching only
+		 * to current session. */
+		xfrm_init_tempstate(x, fl, tmpl, daddr, saddr, family);
+		memcpy(&x->mark, &pol->mark, sizeof(x->mark));
+
+		error = security_xfrm_state_alloc_acquire(x, pol->security, fl->flowi_secid);
+		if (error) {
+			x->km.state = XFRM_STATE_DEAD;
+			to_put = x;
+			x = NULL;
+			goto out;
+		}
+
+		if (km_query(x, tmpl, pol) == 0) {
+			x->km.state = XFRM_STATE_ACQ;
+			list_add(&x->km.all, &net->xfrm.state_all);
+			hlist_add_head(&x->bydst, net->xfrm.state_bydst+h);
+			h = xfrm_src_hash(net, daddr, saddr, encap_family);
+			hlist_add_head(&x->bysrc, net->xfrm.state_bysrc+h);
+			if (x->id.spi) {
+				h = xfrm_spi_hash(net, &x->id.daddr, x->id.spi, x->id.proto, encap_family);
+				hlist_add_head(&x->byspi, net->xfrm.state_byspi+h);
+			}
+			x->lft.hard_add_expires_seconds = net->xfrm.sysctl_acq_expires;
+			tasklet_hrtimer_start(&x->mtimer, ktime_set(net->xfrm.sysctl_acq_expires, 0), HRTIMER_MODE_REL);
+			net->xfrm.state_num++;
+			xfrm_hash_grow_check(net, x->bydst.next != NULL);
+		} else {
+			x->km.state = XFRM_STATE_DEAD;
+			to_put = x;
+			x = NULL;
+			error = -ESRCH;
+		}
+	}
+out:
+	if (x)
+		xfrm_state_hold(x);
+	else
+		*err = acquire_in_progress ? -EAGAIN : error;
+	spin_unlock_bh(&net->xfrm.xfrm_state_lock);
+	if (to_put)
+		xfrm_state_put(to_put);
+	return x;
+}
+```
+
 
 ## xfrm_bundle_create
 
