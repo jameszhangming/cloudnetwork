@@ -88,7 +88,7 @@ static int __init ipip_init(void)
 	err = register_pernet_device(&ipip_net_ops);   //注册net namespace回调函数，更新id值
 	if (err < 0)
 		return err;
-	err = xfrm4_tunnel_register(&ipip_handler, AF_INET);
+	err = xfrm4_tunnel_register(&ipip_handler, AF_INET);   //注册ipip设备处理
 	if (err < 0) {
 		pr_info("%s: can't register tunnel\n", __func__);
 		goto xfrm_tunnel_failed;
