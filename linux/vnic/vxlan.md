@@ -27,6 +27,22 @@ id ID 						    specifies the VXLAN Network Identifer (or VXLAN Segment Identifi
 [ gbp ]							enables the Group Policy extension (VXLAN-GBP).
 
 
+### 参数解释
+
+* VXLAN_F_PROXY
+  * ARP报文代理标志，该标志置位后，VXLAN设备代理处理ARP请求，不再转发ARP出VTEP。
+* VXLAN_F_L3MISS 
+  * 当内层报文目的IP对应的MAC找不到（本地ARP表）时，上报L3MISS，分两种场景：
+* VXLAN_F_L2MISS
+  * 即FDB MISS，即根据内层报文的目的MAC地址，找不到FDB表项（不知道通过哪个vtep到达）；
+* VXLAN_F_RSC
+  * VXLAN内层报文可以分成两种：
+    1. 二层转发报文（目的IP和目的MAC一致）， 该标志对此场景无影响；   //VTEP桥接到bridge设备上
+    2. 三层路由报文（目的IP和目的MAC不同）， 则修改报文的源MAC（改为当前报文的目的MAC）和目的MAC（改为真实的MAC），相当于转化成了二层转发报文；  //VTEP未挂载到bridge上，走路由的方式
+* remote 
+  * 当设置了remote时，相当于在FDB列表中添加了MAC地址为0，目的IP为remote后添加的IP地址。
+
+
 ## 命令示例
 
 ```bash
