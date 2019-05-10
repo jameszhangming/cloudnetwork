@@ -1,58 +1,58 @@
-# ip link ÃüÁî
+# ip link å‘½ä»¤
 
-Í¨¹ıip link¿ÉÒÔ´´½¨vlan¡¢vxlan¡¢veth¡¢macvlan¡¢macvtapµÈµÈĞéÄâÍø¿¨Éè±¸¡£
+é€šè¿‡ip linkå¯ä»¥åˆ›å»ºvlanã€vxlanã€vethã€macvlanã€macvtapç­‰ç­‰è™šæ‹Ÿç½‘å¡è®¾å¤‡ã€‚
 
-## ip linkÃüÁî
+## ip linkå‘½ä»¤
 
-´´½¨ĞéÄâÍø¿¨£¨Í¨ÓÃÊôĞÔ£©:
+åˆ›å»ºè™šæ‹Ÿç½‘å¡ï¼ˆé€šç”¨å±æ€§ï¼‰:
 
 ```bash
 ip link add 
-[ name ] NAME                   #Éè±¸Ãû³Æ
-type TYPE                       #Éè±¸ÀàĞÍ
+[ name ] NAME                   #è®¾å¤‡åç§°
+type TYPE                       #è®¾å¤‡ç±»å‹
 [ link DEVICE ] 		        #specifies the physical device to act operate on.
-[ txqueuelen PACKETS ] 	        #ÉèÖÃ·¢ËÍ¶ÓÁĞ
-[ address LLADDR ] 		        #ÉèÖÃMACµØÖ·
-[ broadcast LLADDR ] 	        #ÉèÖÃ¹ã²¥µØÖ·
-[ mtu MTU ]                     #ÉèÖÃMTUÖµ
+[ txqueuelen PACKETS ] 	        #è®¾ç½®å‘é€é˜Ÿåˆ—
+[ address LLADDR ] 		        #è®¾ç½®MACåœ°å€
+[ broadcast LLADDR ] 	        #è®¾ç½®å¹¿æ’­åœ°å€
+[ mtu MTU ]                     #è®¾ç½®MTUå€¼
 [ numtxqueues QUEUE_COUNT ] 	#specifies the number of transmit queues for new device.
 [ numrxqueues QUEUE_COUNT ] 	#specifies the number of receive queues for new device.
-[ ARGS ]                        #Éè±¸Ïà¹ØµÄ²ÎÊı
+[ ARGS ]                        #è®¾å¤‡ç›¸å…³çš„å‚æ•°
 ```
 
-ĞŞ¸ÄÉè±¸ÊôĞÔ£¨Í¨ÓÃÊôĞÔ£©£º
+ä¿®æ”¹è®¾å¤‡å±æ€§ï¼ˆé€šç”¨å±æ€§ï¼‰ï¼š
 ```bash
 ip link set 
-{DEVICE|group GROUP}         #´ıĞŞ¸ÄµÄÉè±¸
-up|down                      #Æô¶¯/Í£Ö¹Éè±¸£¬ifconfig eth0 up|down
-arp on|arp off               #arpÆô¶¯/arp¹Ø±Õ
-promisc on|off               #»ìÔÓÄ£Ê½¿ª¹Ø
+{DEVICE|group GROUP}         #å¾…ä¿®æ”¹çš„è®¾å¤‡
+up|down                      #å¯åŠ¨/åœæ­¢è®¾å¤‡ï¼Œifconfig eth0 up|down
+arp on|arp off               #arpå¯åŠ¨/arpå…³é—­
+promisc on|off               #æ··æ‚æ¨¡å¼å¼€å…³
 allmulticast on|off
 dynamic on|off 
 multicast on|off 		
-txqueuelen PACKETS           #Éè±¸¶ÓÁĞ³¤¶È£¬ËõĞ´Îª£ºtxqlen
-name NEWNAME                 #Éè±¸Ãû×Ö
-address LLADDR               #MACµØÖ·
-broadcast LLADDR             #¹ã²¥µØÖ·
-mtu MTU	                     #MTUÖµ£¬ifconfig eth0 mtu 1500
-netns {PID | NETNSNAME}      #net name spaceÖµ£¬Ïàµ±ÓÚ°ÑÉè±¸¼ÓÈëµ½Ä³¸öÃüÃû¿Õ¼ä
-alias NAME                   #ÉèÖÃaliasÃû
+txqueuelen PACKETS           #è®¾å¤‡é˜Ÿåˆ—é•¿åº¦ï¼Œç¼©å†™ä¸ºï¼štxqlen
+name NEWNAME                 #è®¾å¤‡åå­—
+address LLADDR               #MACåœ°å€
+broadcast LLADDR             #å¹¿æ’­åœ°å€
+mtu MTU	                     #MTUå€¼ï¼Œifconfig eth0 mtu 1500
+netns {PID | NETNSNAME}      #net name spaceå€¼ï¼Œç›¸å½“äºæŠŠè®¾å¤‡åŠ å…¥åˆ°æŸä¸ªå‘½åç©ºé—´
+alias NAME                   #è®¾ç½®aliaså
 ```
 
-É¾³ıÉè±¸£º
+åˆ é™¤è®¾å¤‡ï¼š
 
 ```bash
 ip link delete <dev> type <type>
 ```
 
-²éÑ¯Éè±¸ĞÅÏ¢£º
+æŸ¥è¯¢è®¾å¤‡ä¿¡æ¯ï¼š
 ```bash
-ip [-s] link list       #-s¿ÉÒÔ¶à¸ö£¬Ô½¶àĞÅÏ¢Ô½·á¸»
-ip [-s] link            #-s¿ÉÒÔ¶à¸ö£¬Ô½¶àĞÅÏ¢Ô½·á¸»
-ip [-s] link ls <ethX>  #-s¿ÉÒÔ¶à¸ö£¬Ô½¶àĞÅÏ¢Ô½·á¸»
+ip [-s] link list       #-så¯ä»¥å¤šä¸ªï¼Œè¶Šå¤šä¿¡æ¯è¶Šä¸°å¯Œ
+ip [-s] link            #-så¯ä»¥å¤šä¸ªï¼Œè¶Šå¤šä¿¡æ¯è¶Šä¸°å¯Œ
+ip [-s] link ls <ethX>  #-så¯ä»¥å¤šä¸ªï¼Œè¶Šå¤šä¿¡æ¯è¶Šä¸°å¯Œ
 ```
 
-### typeÀàĞÍÁĞ±í
+### typeç±»å‹åˆ—è¡¨
 ```
 bridge		Ethernet Bridge device 
 can		    Controller Area Network interface 
@@ -79,11 +79,11 @@ lowpan		Interface for 6LoWPAN (IPv6) over IEEE 802.15.4
 geneve		GEneric NEtwork Virtualization Encapsulation
 ```
 
-## ĞéÄâÍø¿¨´´½¨
+## è™šæ‹Ÿç½‘å¡åˆ›å»º
 
-²»Í¬ÀàĞÍµÄĞéÄâÍø¿¨Ö§³Ö²»Í¬µÄÊôĞÔ¡£
+ä¸åŒç±»å‹çš„è™šæ‹Ÿç½‘å¡æ”¯æŒä¸åŒçš„å±æ€§ã€‚
 
-### vlanÉè±¸
+### vlanè®¾å¤‡
 ```bash
 ip link add link <DEVICE> name <NAME> type vlan 
 id VLANID                       specifies the VLAN Identifer to use.
@@ -96,7 +96,7 @@ id VLANID                       specifies the VLAN Identifer to use.
 [ egress-qos-map QOS-MAP ]      defines a mapping of Linux internal packet priority to VLAN header prio field but for outgoing frames.
 ```
 
-### vxlanÉè±¸
+### vxlanè®¾å¤‡
 ```bash
 ip link add <DEVICE> type vxlan 
 id ID                           specifies the VXLAN Network Identifer (or VXLAN Segment Identifier) to use.
@@ -121,24 +121,24 @@ id ID                           specifies the VXLAN Network Identifer (or VXLAN 
 [ gbp ]	                        enables the Group Policy extension (VXLAN-GBP).
 ```
 
-### ipvlanÉè±¸
+### ipvlanè®¾å¤‡
 ```bash
 ip link add link <master-dev> <slave-dev> 
 type ipvlan 
 mode { l2 | L3 }
 ```
 
-#### modeÊôĞÔ
-|  mode | ×÷ÓÃ |
+#### modeå±æ€§
+|  mode | ä½œç”¨ |
 |:-----|:-----|
 |L2 mode|In this mode TX processing happens on the stack instance attached to the slave device and packets are switched and queued to the master device to send out. In this mode the slaves will RX/TX multicast and broadcast (if applicable) as well.|
 |L3 mode|In this mode TX processing upto L3 happens on the stack instance attached to the slave device and packets are switched to the stack instance of the master device for the L2 processing and routing from that instance will be used before packets are queued on the outbound device. In this mode the slaves will not receive nor can send multicast / broadcast traffic.|
 
 
-### gre/ipip/sitÉè±¸
+### gre/ipip/sitè®¾å¤‡
 ```bash
 ip link add DEVICE 
-type { gre | ipip | sit }  	Éè±¸ÀàĞÍ
+type { gre | ipip | sit }  	è®¾å¤‡ç±»å‹
 remote ADDR                     specifies the remote address of the tun-nel.
 local ADDR                      specifies the fixed local address for tun-neled packets.  It must be an address on another inter-face on this host.
 [ encap { fou | gue | none } ] 	specifies type of secondary UDP encapsulation.
@@ -148,7 +148,7 @@ local ADDR                      specifies the fixed local address for tun-neled 
 [ [no]encap-remc-sum ]          specifies if Remote Checksum Offload is enabled. This is only applicable for Generic UDP Encapsulation.
 ```
 
-### geneveÉè±¸
+### geneveè®¾å¤‡
 ```bash
 ip link add DEVICE type geneve 
 id VNI                   specifies the Virtual Network Identifer to use.
@@ -158,7 +158,7 @@ remote IPADDR            specifies the unicast destination IP address to use in 
 [ flowlabel FLOWLABEL ]	 specifies the flow label to use in outgoing packets.
 ```
 
-### ipoibÉè±¸
+### ipoibè®¾å¤‡
 ```bash
 ip link add DEVICE name NAME type ipoib 
 [ pkey PKEY ] 	specifies the IB P-Key to use.
