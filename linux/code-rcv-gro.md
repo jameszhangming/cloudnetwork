@@ -30,6 +30,34 @@ static const struct net_offload tcpv4_offload = {
 ```
 
 
+## napi gro入口
+
+```c
+static inline int gro_cell_poll(struct napi_struct *napi, int budget)
+{
+	struct gro_cell *cell = container_of(napi, struct gro_cell, napi);
+	struct sk_buff *skb;
+	int work_done = 0;
+
+	spin_lock(&cell->napi_skbs.lock);
+	while (work_done < budget) {
+		skb = __skb_dequeue(&cell->napi_skbs);
+		if (!skb)
+			break;
+		spin_unlock(&cell->napi_skbs.lock);
+		napi_gro_receive(napi, skb);         //开始执行gro收包逻辑
+		work_done++;
+		spin_lock(&cell->napi_skbs.lock);
+	}
+
+	if (work_done < budget)
+		napi_complete(napi);
+	spin_unlock(&cell->napi_skbs.lock);
+	return work_done;
+}
+```
+
+
 ## 入口函数
 
 ```c
@@ -147,7 +175,7 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	struct sk_buff **pp = NULL;
 	struct packet_offload *ptype;
 	__be16 type = skb->protocol;
-	struct list_head *head = &offload_base;		//packet_offload链表
+	struct list_head *head = &offload_base;		//packet_offload链表，ip协议等
 	int same_flow;
 	enum gro_result ret;
 	int grow;
