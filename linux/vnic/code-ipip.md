@@ -290,7 +290,7 @@ int ip_tunnel_newlink(struct net_device *dev, struct nlattr *tb[],
 	if (err)
 		goto out;
 
-	if (dev->type == ARPHRD_ETHER && !tb[IFLA_ADDRESS])
+	if (dev->type == ARPHRD_ETHER && !tb[IFLA_ADDRESS])  //不成立，不会设置mac地址
 		eth_hw_addr_random(dev);
 
 	mtu = ip_tunnel_bind_dev(dev);   //计算设备mtu值
@@ -527,7 +527,7 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 		skb->dev = tunnel->dev;
 	}
 
-	gro_cells_receive(&tunnel->gro_cells, skb);   //收包
+	gro_cells_receive(&tunnel->gro_cells, skb);   //内层ip报文放入gro napi链表，触发软中断
 	return 0;
 
 drop:
