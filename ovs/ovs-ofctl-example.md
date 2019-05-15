@@ -8,7 +8,7 @@
 ### mac学习流表
 
 ```bash
-ovs-ofctl add-flow "table=10,priority=1 actions=learn(
+ovs-ofctl add-flow br0 "table=10,priority=1 actions=learn(
 	table=20,hard_timeout=300,priority=1,
 	NXM_OF_VLAN_TCI[0..11],NXM_OF_ETH_DST[]=NXM_OF_ETH_SRC[],
 	load:0->NXM_OF_VLAN_TCI[],load:NXM_NX_TUN_ID[]->NXM_NX_TUN_ID[],output:NXM_OF_IN_PORT[]),output:1"
@@ -31,7 +31,7 @@ output:NXM_OF_IN_PORT[]					：指定发送给哪个port，由于是从 port2 �
 ## ARP代答
 
 ```bash
-ovs-ofctl add-flow " table=10,priority=1,arp,dl_vlan=1,nw_dst=$dip,actions=
+ovs-ofctl add-flow br0 " table=10,priority=1,arp,dl_vlan=1,nw_dst=$dip,actions=
 ('move:NXM_OF_ETH_SRC[]->NXM_OF_ETH_DST[],'	    # 将ARP Request数据包的源MAC地址作为ARP Reply数据包的目的MAC地址
   'mod_dl_src:%(mac),'				            # 将ARP Request请求的目的IP的MAC地址作为ARP Reply数据包的源MAC地址
   'load:0x2->NXM_OF_ARP_OP[],'			        # 构造的ARP包的类型设置为ARP Reply
