@@ -237,6 +237,24 @@ enum {
 };
 ```
 
+### TCP Socket状态说明
+
+![tcp-socket](images/tcp-socket.png "tcp-socket")
+
+![tcp-status](images/tcp-status.png "tcp-status")
+
+* CLOSED：表示初始状态。对服务端和C客户端双方都一样。
+* LISTEN：表示监听状态。服务端调用了listen函数，可以开始accept连接了。
+* SYN_SENT：表示客户端已经发送了SYN报文。当客户端调用connect函数发起连接时，首先发SYN给服务端，然后自己进入SYN_SENT状态，并等待服务端发送ACK+SYN。
+* SYN_RCVD：表示服务端收到客户端发送SYN报文。服务端收到这个报文后，进入SYN_RCVD状态，然后发送ACK+SYN给客户端。
+* ESTABLISHED：表示连接已经建立成功了。服务端发送完ACK+SYN后进入该状态，客户端收到ACK后也进入该状态。
+* FIN_WAIT_1：表示主动关闭连接。无论哪方调用close函数发送FIN报文都会进入这个这个状态。
+* FIN_WAIT_2：表示被动关闭方同意关闭连接。主动关闭连接方收到被动关闭方返回的ACK后，会进入该状态。
+* TIME_WAIT：表示收到对方的FIN报文并发送了ACK报文，就等2MSL后即可回到CLOSED状态了。如果FIN_WAIT_1状态下，收到对方同时带FIN标志和ACK标志的报文时，可以直接进入TIME_WAIT状态，而无须经过FIN_WAIT_2状态。
+* CLOSING：表示双方同时关闭连接。如果双方几乎同时调用close函数，那么会出现双方同时发送FIN报文的情况，此时就会出现CLOSING状态，表示双方都在关闭连接。
+* CLOSE_WAIT：表示被动关闭方等待关闭。当收到对方调用close函数发送的FIN报文时，回应对方ACK报文，此时进入CLOSE_WAIT状态。
+* LAST_ACK：表示被动关闭方发送FIN报文后，等待对方的ACK报文状态，当收到ACK后进入CLOSED状态。
+
 
 ## TCP Listen(inet_listen)
 
@@ -1200,7 +1218,7 @@ void tcp_close(struct sock *sk, long timeout)
 		/* Check zero linger _after_ checking for unread data. */
 		sk->sk_prot->disconnect(sk, 0);
 		NET_INC_STATS_USER(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
-	} else if (tcp_close_state(sk)) {    //设置关闭状态
+	} else if (tcp_close_state(sk)) {    //设置关闭状态，根据当前状态设置响应状态
 		/* We FIN if the application ate all the data before
 		 * zapping the connection.
 		 */
