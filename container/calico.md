@@ -1,136 +1,136 @@
-# CalicoÈÝÆ÷ÍøÂç·½°¸
+# Calicoå®¹å™¨ç½‘ç»œæ–¹æ¡ˆ
 
-Calico¹²ÓÐÁ½¸öÈÝÆ÷ÍøÂç·½°¸£ºCalico BGPºÍCalico IPIP¡£
+Calicoå…±æœ‰ä¸¤ä¸ªå®¹å™¨ç½‘ç»œæ–¹æ¡ˆï¼šCalico BGPå’ŒCalico IPIPã€‚
 
-## Calico BGP·½°¸
+## Calico BGPæ–¹æ¡ˆ
 
-Calico BGPÊý¾ÝÃæÈçÏÂ£º
+Calico BGPæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![calico-bgp](images/calico-bgp.png "calico-bgp")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AÄÚµÄcalic0Éè±¸µÄÑÚÂë³¤¶ÈÎª32£¬¼´ÓëÈÝÆ÷BÊôÓÚ²»Í¬ÍøÂç£¬ÐèÒªÍ¨¹ýÍø¹Ø½øÐÐÍ¨ÐÅ
-2. ÈÝÆ÷A²éÕÒÂ·ÓÉ±í£¬´æÔÚdefaultÂ·ÓÉ£¬ÏÂÒ»ÌøÎª169.254.1.1£¬ÇÒ169.254.1.1¿ÉÍ¨¹ýcali0Ö±´ï
-3. ÈÝÆ÷A·¢ËÍARPÇëÇó¸ø169.254.1.1£¬ARPÇëÇó±¨ÎÄµ½´ïvethÉè±¸µÄÁíÒ»¶ËcalifXXX½ÓÊÕ
-4. ÓÉÓÚcalifXXXÉè±¸Ê¹ÄÜÁËARP proxy£¬LinuxÄÚºË»áÒÔcalifXXXµÄMACµØÖ·À´ÏìÓ¦ARPÇëÇó£¬²¢´ÓcalifXXX·¢³ö£»
-5. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦ºó£¬µÃµ½169.254.1.1µÄMACµØÖ·£¬·â×°¶þ²ã±¨ÎÄ£¬·¢ËÍ±¨ÎÄ¸ø169.254.1.1£¬±¨ÎÄ´Ócali0Éè±¸·¢³ö
-6. ±¨ÎÄÍ¨¹ývethÉè±¸½øÈëHostÄÚºËÐ­ÒéÕ»£»
-7. ÓÉÓÚÄ¿µÄIP²»ÔÚ±¾½Úµã£¬HostÄÚºË»á½øÐÐ±¨ÎÄ×ª·¢£¨ip_forwardÒÑ¿ªÆô£©
-8. HostÄÚºË³¬ÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýcalifYYYYYYÉè±¸¿ÉÒÔÖ±´ï
-9. HostÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷B£¬Í¨¹ýcalifYYYYYYÉè±¸·¢³ö
-10. ARPÇëÇó±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷B£¬ÈÝÆ÷BÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ývethÉè±¸µ½´ïHostÄÚºË
-11. HostÄÚºË¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬´ÓcalifYYYYYYÉè±¸·¢³ö
-12. ±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷B
+1. å®¹å™¨Aå†…çš„calic0è®¾å¤‡çš„æŽ©ç é•¿åº¦ä¸º32ï¼Œå³ä¸Žå®¹å™¨Bå±žäºŽä¸åŒç½‘ç»œï¼Œéœ€è¦é€šè¿‡ç½‘å…³è¿›è¡Œé€šä¿¡
+2. å®¹å™¨AæŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå­˜åœ¨defaultè·¯ç”±ï¼Œä¸‹ä¸€è·³ä¸º169.254.1.1ï¼Œä¸”169.254.1.1å¯é€šè¿‡cali0ç›´è¾¾
+3. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™169.254.1.1ï¼ŒARPè¯·æ±‚æŠ¥æ–‡åˆ°è¾¾vethè®¾å¤‡çš„å¦ä¸€ç«¯califXXXæŽ¥æ”¶
+4. ç”±äºŽcalifXXXè®¾å¤‡ä½¿èƒ½äº†ARP proxyï¼ŒLinuxå†…æ ¸ä¼šä»¥califXXXçš„MACåœ°å€æ¥å“åº”ARPè¯·æ±‚ï¼Œå¹¶ä»ŽcalifXXXå‘å‡ºï¼›
+5. å®¹å™¨Aæ”¶åˆ°ARPå“åº”åŽï¼Œå¾—åˆ°169.254.1.1çš„MACåœ°å€ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå‘é€æŠ¥æ–‡ç»™169.254.1.1ï¼ŒæŠ¥æ–‡ä»Žcali0è®¾å¤‡å‘å‡º
+6. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡è¿›å…¥Hostå†…æ ¸åè®®æ ˆï¼›
+7. ç”±äºŽç›®çš„IPä¸åœ¨æœ¬èŠ‚ç‚¹ï¼ŒHostå†…æ ¸ä¼šè¿›è¡ŒæŠ¥æ–‡è½¬å‘ï¼ˆip_forwardå·²å¼€å¯ï¼‰
+8. Hostå†…æ ¸è¶…æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡califYYYYYYè®¾å¤‡å¯ä»¥ç›´è¾¾
+9. Hostå†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Bï¼Œé€šè¿‡califYYYYYYè®¾å¤‡å‘å‡º
+10. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨Bï¼Œå®¹å™¨Bå“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡vethè®¾å¤‡åˆ°è¾¾Hostå†…æ ¸
+11. Hostå†…æ ¸æ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œä»ŽcalifYYYYYYè®¾å¤‡å‘å‡º
+12. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨B
 
-> HostµÄ±¾µØÂ·ÓÉÔÚ´´½¨ÈÝÆ÷µÄÊ±ºò¾ÍÄÜ¹»½¨Á¢£¬²»ÒÀÀµBGP
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AÄÚµÄcalic0Éè±¸µÄÑÚÂë³¤¶ÈÎª32£¬¼´ÓëÈÝÆ÷BÊôÓÚ²»Í¬ÍøÂç£¬ÐèÒªÍ¨¹ýÍø¹Ø½øÐÐÍ¨ÐÅ
-2. ÈÝÆ÷A²éÕÒÂ·ÓÉ±í£¬´æÔÚdefaultÂ·ÓÉ£¬ÏÂÒ»ÌøÎª169.254.1.1£¬ÇÒ169.254.1.1¿ÉÍ¨¹ýcali0Ö±´ï
-3. ÈÝÆ÷A·¢ËÍARPÇëÇó¸ø169.254.1.1£¬ARPÇëÇó±¨ÎÄµ½´ïvethÉè±¸µÄÁíÒ»¶ËcalifXXX½ÓÊÕ
-4. ÓÉÓÚcalifXXXÉè±¸Ê¹ÄÜÁËARP proxy£¬LinuxÄÚºË»áÒÔcalifXXXµÄMACµØÖ·À´ÏìÓ¦ARPÇëÇó£¬²¢´ÓcalifXXX·¢³ö£»
-5. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦ºó£¬µÃµ½169.254.1.1µÄMACµØÖ·£¬·â×°¶þ²ã±¨ÎÄ£¬·¢ËÍ±¨ÎÄ¸ø169.254.1.1£¬±¨ÎÄ´Ócali0Éè±¸·¢³ö
-6. ±¨ÎÄÍ¨¹ývethÉè±¸½øÈëHost1ÄÚºËÐ­ÒéÕ»£»
-7. ÓÉÓÚÄ¿µÄIP²»ÔÚ±¾½Úµã£¬Host1ÄÚºË»á½øÐÐ±¨ÎÄ×ª·¢£¨ip_forwardÒÑ¿ªÆô£©
-8. Host1ÄÚºË²éÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýÏÂÒ»Ìø192.168.0.102£¨Host2£©¿ÉÒÔµ½´ï£¬¶ø192.168.0.102¿ÉÒÔÖ±´ï
-9. Host1ÄÚºË·¢ËÍARPÇëÇó¸øHost2£¬Í¨¹ýeth0Éè±¸·¢³ö
-10. ARPÇëÇó±¨ÎÄÍ¨¹ýµ×²ãÍøÂçµ½´ïHost2£¬Host2ÏìÓ¦ARPÇëÇó£¬Í¨¹ýµ×²ãÍøÂçµ½´ïHost1
-11. Host1ÄÚºËÐÞ¸Ä±¨ÎÄ¶þ²ãÍ·£¬·¢ËÍ±¨ÎÄ¸øHost2
-12. Host2ÊÕ°ü±¨ÎÄ£¬ÓÉÓÚÄ¿µÄIP²»ÔÚ±¾½Úµã£¬Host2ÄÚºË»á½øÐÐ±¨ÎÄ×ª·¢£¨ip_forwardÒÑ¿ªÆô£©
-13. Host2²éÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýcalifYYYYYÉè±¸¿ÉÒÔÖ±´ï
-14. Host2ÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷D£¬Í¨¹ýcalifYYYYYÉè±¸·¢³ö
-15. ARPÇëÇó±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷D£¬ÈÝÆ÷BÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ývethÉè±¸µ½´ïHost2ÄÚºË
-16. Host2ÄÚºË¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬´ÓcalifYYYYYÉè±¸·¢³ö
-17. ±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷D
-
-> Host1ÖÐ¹ØÓÚÈÝÆ÷DµÄÂ·ÓÉÐÅÏ¢ÊÇÈçºÎ»ñÈ¡µÄ£¿ Õâ¾ÍÊÇCalico BGP·½°¸µÄºËÐÄ£¬´ð°¸ÊÇÍ¨¹ýBIRDÔÚ½Úµã¼äÍ¬²½µÃµ½
+> Hostçš„æœ¬åœ°è·¯ç”±åœ¨åˆ›å»ºå®¹å™¨çš„æ—¶å€™å°±èƒ½å¤Ÿå»ºç«‹ï¼Œä¸ä¾èµ–BGP
 
 
-### Calico BGPÊý¾ÝÃæ×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ·½°¸»ù±¾Ô­Àí
-  * ÈÝÆ÷IPµÄÑÚÂëÊÇ32Î»£¬Ç¿ÖÆ×ßÈý²ã×ª·¢
-  * Í¬²½¸÷½ÚµãµÄÂ·ÓÉÐÅÏ¢£¬Ê¹ËùÓÐ½ÚµãÕÆÎÕÈ«¾ÖµÄÍøÂç×ª·¢¹æÔò
-* ·½°¸ÓÅÊÆ
-  * ·½°¸²»ÒÀÀµµ×²ãÍøÂç£¬Ö»ÒªÇóµ×²ãÈý²ãÄÜÍ¨¼´¿É
-  * Ö§³Ö°´½Úµã·ÖÅäIPÍø¶Î£¬Í¬Ê±»¹¿ÉÒÔ×Ô¶¨ÒåÈÝÆ÷IP£¨Â·ÓÉÍ¨¹ýÍøÂç³¤¶ÈÓÅÏÈÆ¥Åä£©
-* ·½°¸ÁÓÊÆ
-  * ±¾½ÚµãÒ²ÐèÒªÍ¨¹ýÂ·ÓÉ×ª·¢£¬ÐÔÄÜ½Ï²î 
-  * Â·ÓÉÍ¨¹ýBIRDÍ¬²½£¬ÊôÓÚÒì²½Í¬²½·½Ê½£¬ÈÝÆ÷´´½¨ºóÁ¢¼´Í¨ÐÅ¿ÉÄÜ´æÔÚÂ·ÓÉÎ´Í¬²½µÄ·çÏÕ
-  * ÔÚµ×²ãÍøÂçÖÐ±©Â¶ÁËÈÝÆ÷ÍøÂçµØÖ·
-  * µ±½ÚµãÖ®¼ä¶þ²ã²»¿É´ïÊ±£¬ÐèÒªÔÚÂ·ÓÉÆ÷ÉÏ·¢²¼Â·ÓÉ£¬·ñÔòÈÝÆ÷Ö®¼äÎÞ·¨Í¨ÐÅ
-* ¸Ä½øÏë·¨
-  * ±ÜÃâ169.254.1.1µÄARPÇëÇó
-    * ¿ÉÒÔ¹Ì¶¨califXXÉè±¸µÄMACµØÖ·
-	* ÈÝÆ÷ÄÚ¹Ì»¯ARP±íÏî
-  * Ê¹ÓÃetcdÍ¬²½Â·ÓÉÐÅÏ¢£¬È¥³ý¶ÔBGPµÄÒÀÀµ
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå†…çš„calic0è®¾å¤‡çš„æŽ©ç é•¿åº¦ä¸º32ï¼Œå³ä¸Žå®¹å™¨Bå±žäºŽä¸åŒç½‘ç»œï¼Œéœ€è¦é€šè¿‡ç½‘å…³è¿›è¡Œé€šä¿¡
+2. å®¹å™¨AæŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå­˜åœ¨defaultè·¯ç”±ï¼Œä¸‹ä¸€è·³ä¸º169.254.1.1ï¼Œä¸”169.254.1.1å¯é€šè¿‡cali0ç›´è¾¾
+3. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™169.254.1.1ï¼ŒARPè¯·æ±‚æŠ¥æ–‡åˆ°è¾¾vethè®¾å¤‡çš„å¦ä¸€ç«¯califXXXæŽ¥æ”¶
+4. ç”±äºŽcalifXXXè®¾å¤‡ä½¿èƒ½äº†ARP proxyï¼ŒLinuxå†…æ ¸ä¼šä»¥califXXXçš„MACåœ°å€æ¥å“åº”ARPè¯·æ±‚ï¼Œå¹¶ä»ŽcalifXXXå‘å‡ºï¼›
+5. å®¹å™¨Aæ”¶åˆ°ARPå“åº”åŽï¼Œå¾—åˆ°169.254.1.1çš„MACåœ°å€ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå‘é€æŠ¥æ–‡ç»™169.254.1.1ï¼ŒæŠ¥æ–‡ä»Žcali0è®¾å¤‡å‘å‡º
+6. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡è¿›å…¥Host1å†…æ ¸åè®®æ ˆï¼›
+7. ç”±äºŽç›®çš„IPä¸åœ¨æœ¬èŠ‚ç‚¹ï¼ŒHost1å†…æ ¸ä¼šè¿›è¡ŒæŠ¥æ–‡è½¬å‘ï¼ˆip_forwardå·²å¼€å¯ï¼‰
+8. Host1å†…æ ¸æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡ä¸‹ä¸€è·³192.168.0.102ï¼ˆHost2ï¼‰å¯ä»¥åˆ°è¾¾ï¼Œè€Œ192.168.0.102å¯ä»¥ç›´è¾¾
+9. Host1å†…æ ¸å‘é€ARPè¯·æ±‚ç»™Host2ï¼Œé€šè¿‡eth0è®¾å¤‡å‘å‡º
+10. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡åº•å±‚ç½‘ç»œåˆ°è¾¾Host2ï¼ŒHost2å“åº”ARPè¯·æ±‚ï¼Œé€šè¿‡åº•å±‚ç½‘ç»œåˆ°è¾¾Host1
+11. Host1å†…æ ¸ä¿®æ”¹æŠ¥æ–‡äºŒå±‚å¤´ï¼Œå‘é€æŠ¥æ–‡ç»™Host2
+12. Host2æ”¶åŒ…æŠ¥æ–‡ï¼Œç”±äºŽç›®çš„IPä¸åœ¨æœ¬èŠ‚ç‚¹ï¼ŒHost2å†…æ ¸ä¼šè¿›è¡ŒæŠ¥æ–‡è½¬å‘ï¼ˆip_forwardå·²å¼€å¯ï¼‰
+13. Host2æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡califYYYYYè®¾å¤‡å¯ä»¥ç›´è¾¾
+14. Host2å†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œé€šè¿‡califYYYYYè®¾å¤‡å‘å‡º
+15. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨Dï¼Œå®¹å™¨Bå“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡vethè®¾å¤‡åˆ°è¾¾Host2å†…æ ¸
+16. Host2å†…æ ¸æ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œä»ŽcalifYYYYYè®¾å¤‡å‘å‡º
+17. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨D
+
+> Host1ä¸­å…³äºŽå®¹å™¨Dçš„è·¯ç”±ä¿¡æ¯æ˜¯å¦‚ä½•èŽ·å–çš„ï¼Ÿ è¿™å°±æ˜¯Calico BGPæ–¹æ¡ˆçš„æ ¸å¿ƒï¼Œç­”æ¡ˆæ˜¯é€šè¿‡BIRDåœ¨èŠ‚ç‚¹é—´åŒæ­¥å¾—åˆ°
+
+
+### Calico BGPæ•°æ®é¢æ€»ç»“
+
+* æ–¹æ¡ˆåŸºæœ¬åŽŸç†
+  * å®¹å™¨IPçš„æŽ©ç æ˜¯32ä½ï¼Œå¼ºåˆ¶èµ°ä¸‰å±‚è½¬å‘
+  * åŒæ­¥å„èŠ‚ç‚¹çš„è·¯ç”±ä¿¡æ¯ï¼Œä½¿æ‰€æœ‰èŠ‚ç‚¹æŽŒæ¡å…¨å±€çš„ç½‘ç»œè½¬å‘è§„åˆ™
+* æ–¹æ¡ˆä¼˜åŠ¿
+  * æ–¹æ¡ˆä¸ä¾èµ–åº•å±‚ç½‘ç»œï¼Œåªè¦æ±‚åº•å±‚ä¸‰å±‚èƒ½é€šå³å¯
+  * æ”¯æŒæŒ‰èŠ‚ç‚¹åˆ†é…IPç½‘æ®µï¼ŒåŒæ—¶è¿˜å¯ä»¥è‡ªå®šä¹‰å®¹å™¨IPï¼ˆè·¯ç”±é€šè¿‡ç½‘ç»œé•¿åº¦ä¼˜å…ˆåŒ¹é…ï¼‰
+* æ–¹æ¡ˆåŠ£åŠ¿
+  * æœ¬èŠ‚ç‚¹ä¹Ÿéœ€è¦é€šè¿‡è·¯ç”±è½¬å‘ï¼Œæ€§èƒ½è¾ƒå·® 
+  * è·¯ç”±é€šè¿‡BIRDåŒæ­¥ï¼Œå±žäºŽå¼‚æ­¥åŒæ­¥æ–¹å¼ï¼Œå®¹å™¨åˆ›å»ºåŽç«‹å³é€šä¿¡å¯èƒ½å­˜åœ¨è·¯ç”±æœªåŒæ­¥çš„é£Žé™©
+  * åœ¨åº•å±‚ç½‘ç»œä¸­æš´éœ²äº†å®¹å™¨ç½‘ç»œåœ°å€
+  * å½“èŠ‚ç‚¹ä¹‹é—´äºŒå±‚ä¸å¯è¾¾æ—¶ï¼Œéœ€è¦åœ¨è·¯ç”±å™¨ä¸Šå‘å¸ƒè·¯ç”±ï¼Œå¦åˆ™å®¹å™¨ä¹‹é—´æ— æ³•é€šä¿¡
+* æ”¹è¿›æƒ³æ³•
+  * é¿å…169.254.1.1çš„ARPè¯·æ±‚
+    * å¯ä»¥å›ºå®šcalifXXè®¾å¤‡çš„MACåœ°å€
+	* å®¹å™¨å†…å›ºåŒ–ARPè¡¨é¡¹
+  * ä½¿ç”¨etcdåŒæ­¥è·¯ç”±ä¿¡æ¯ï¼ŒåŽ»é™¤å¯¹BGPçš„ä¾èµ–
   
   
-## Calico IPIP·½°¸
+## Calico IPIPæ–¹æ¡ˆ
 
-ÓÉÓÚCalico BGP·½°¸°ÑÈÝÆ÷ÍøÂç±©Â¶µ½ÁËµ×²ãÍøÂçÖÐ£¬ ¶øCalico IPIP·½°¸°ÑÈÝÆ÷ÍøÂçÐÅÏ¢Í¨¹ýIPËíµÀÆÁ±ÎÁË£¬¶øÇÒÍ¨¹ýIPIP·½°¸¿ÉÒÔÌá¹©¼ÓÃÜ´«ÊäµÄ¹¦ÄÜ£¬·ÀÖ¹±¨ÎÄ±»ÇÔÌý
+ç”±äºŽCalico BGPæ–¹æ¡ˆæŠŠå®¹å™¨ç½‘ç»œæš´éœ²åˆ°äº†åº•å±‚ç½‘ç»œä¸­ï¼Œ è€ŒCalico IPIPæ–¹æ¡ˆæŠŠå®¹å™¨ç½‘ç»œä¿¡æ¯é€šè¿‡IPéš§é“å±è”½äº†ï¼Œè€Œä¸”é€šè¿‡IPIPæ–¹æ¡ˆå¯ä»¥æä¾›åŠ å¯†ä¼ è¾“çš„åŠŸèƒ½ï¼Œé˜²æ­¢æŠ¥æ–‡è¢«çªƒå¬
 
-Calicao IPIPÊý¾ÝÃæÈçÏÂ£º
+Calicao IPIPæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![calico-ipip](images/calico-ipip.png "calico-ipip")
 
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨Í¬Calico BGP£©£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆåŒCalico BGPï¼‰ï¼š
 
-1. ÈÝÆ÷AÄÚµÄcalic0Éè±¸µÄÑÚÂë³¤¶ÈÎª32£¬¼´ÓëÈÝÆ÷BÊôÓÚ²»Í¬ÍøÂç£¬ÐèÒªÍ¨¹ýÍø¹Ø½øÐÐÍ¨ÐÅ
-2. ÈÝÆ÷A²éÕÒÂ·ÓÉ±í£¬´æÔÚdefaultÂ·ÓÉ£¬ÏÂÒ»ÌøÎª169.254.1.1£¬ÇÒ169.254.1.1¿ÉÍ¨¹ýcali0Ö±´ï
-3. ÈÝÆ÷A·¢ËÍARPÇëÇó¸ø169.254.1.1£¬ARPÇëÇó±¨ÎÄµ½´ïvethÉè±¸µÄÁíÒ»¶ËcalifXXX½ÓÊÕ
-4. ÓÉÓÚcalifXXXÉè±¸Ê¹ÄÜÁËARP proxy£¬LinuxÄÚºË»áÒÔcalifXXXµÄMACµØÖ·À´ÏìÓ¦ARPÇëÇó£¬²¢´ÓcalifXXX·¢³ö£»
-5. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦ºó£¬µÃµ½169.254.1.1µÄMACµØÖ·£¬·â×°¶þ²ã±¨ÎÄ£¬·¢ËÍ±¨ÎÄ¸ø169.254.1.1£¬±¨ÎÄ´Ócali0Éè±¸·¢³ö
-6. ±¨ÎÄÍ¨¹ývethÉè±¸½øÈëHostÄÚºËÐ­ÒéÕ»£»
-7. ÓÉÓÚÄ¿µÄIP²»ÔÚ±¾½Úµã£¬HostÄÚºË»á½øÐÐ±¨ÎÄ×ª·¢£¨ip_forwardÒÑ¿ªÆô£©
-8. HostÄÚºË³¬ÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýcalifYYYYYYÉè±¸¿ÉÒÔÖ±´ï
-9. HostÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷B£¬Í¨¹ýcalifYYYYYYÉè±¸·¢³ö
-10. ARPÇëÇó±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷B£¬ÈÝÆ÷BÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ývethÉè±¸µ½´ïHostÄÚºË
-11. HostÄÚºË¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬´ÓcalifYYYYYYÉè±¸·¢³ö
-12. ±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷B
+1. å®¹å™¨Aå†…çš„calic0è®¾å¤‡çš„æŽ©ç é•¿åº¦ä¸º32ï¼Œå³ä¸Žå®¹å™¨Bå±žäºŽä¸åŒç½‘ç»œï¼Œéœ€è¦é€šè¿‡ç½‘å…³è¿›è¡Œé€šä¿¡
+2. å®¹å™¨AæŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå­˜åœ¨defaultè·¯ç”±ï¼Œä¸‹ä¸€è·³ä¸º169.254.1.1ï¼Œä¸”169.254.1.1å¯é€šè¿‡cali0ç›´è¾¾
+3. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™169.254.1.1ï¼ŒARPè¯·æ±‚æŠ¥æ–‡åˆ°è¾¾vethè®¾å¤‡çš„å¦ä¸€ç«¯califXXXæŽ¥æ”¶
+4. ç”±äºŽcalifXXXè®¾å¤‡ä½¿èƒ½äº†ARP proxyï¼ŒLinuxå†…æ ¸ä¼šä»¥califXXXçš„MACåœ°å€æ¥å“åº”ARPè¯·æ±‚ï¼Œå¹¶ä»ŽcalifXXXå‘å‡ºï¼›
+5. å®¹å™¨Aæ”¶åˆ°ARPå“åº”åŽï¼Œå¾—åˆ°169.254.1.1çš„MACåœ°å€ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå‘é€æŠ¥æ–‡ç»™169.254.1.1ï¼ŒæŠ¥æ–‡ä»Žcali0è®¾å¤‡å‘å‡º
+6. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡è¿›å…¥Hostå†…æ ¸åè®®æ ˆï¼›
+7. ç”±äºŽç›®çš„IPä¸åœ¨æœ¬èŠ‚ç‚¹ï¼ŒHostå†…æ ¸ä¼šè¿›è¡ŒæŠ¥æ–‡è½¬å‘ï¼ˆip_forwardå·²å¼€å¯ï¼‰
+8. Hostå†…æ ¸è¶…æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡califYYYYYYè®¾å¤‡å¯ä»¥ç›´è¾¾
+9. Hostå†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Bï¼Œé€šè¿‡califYYYYYYè®¾å¤‡å‘å‡º
+10. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨Bï¼Œå®¹å™¨Bå“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡vethè®¾å¤‡åˆ°è¾¾Hostå†…æ ¸
+11. Hostå†…æ ¸æ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œä»ŽcalifYYYYYYè®¾å¤‡å‘å‡º
+12. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨B
 
-> HostµÄ±¾µØÂ·ÓÉÔÚ´´½¨ÈÝÆ÷µÄÊ±ºò¾ÍÄÜ¹»½¨Á¢£¬²»ÒÀÀµBGP
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AÄÚµÄcalic0Éè±¸µÄÑÚÂë³¤¶ÈÎª32£¬¼´ÓëÈÝÆ÷BÊôÓÚ²»Í¬ÍøÂç£¬ÐèÒªÍ¨¹ýÍø¹Ø½øÐÐÍ¨ÐÅ
-2. ÈÝÆ÷A²éÕÒÂ·ÓÉ±í£¬´æÔÚdefaultÂ·ÓÉ£¬ÏÂÒ»ÌøÎª169.254.1.1£¬ÇÒ169.254.1.1¿ÉÍ¨¹ýcali0Ö±´ï
-3. ÈÝÆ÷A·¢ËÍARPÇëÇó¸ø169.254.1.1£¬ARPÇëÇó±¨ÎÄµ½´ïvethÉè±¸µÄÁíÒ»¶ËcalifXXX½ÓÊÕ
-4. ÓÉÓÚcalifXXXÉè±¸Ê¹ÄÜÁËARP proxy£¬LinuxÄÚºË»áÒÔcalifXXXµÄMACµØÖ·À´ÏìÓ¦ARPÇëÇó£¬²¢´ÓcalifXXX·¢³ö£»
-5. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦ºó£¬µÃµ½169.254.1.1µÄMACµØÖ·£¬·â×°¶þ²ã±¨ÎÄ£¬·¢ËÍ±¨ÎÄ¸ø169.254.1.1£¬±¨ÎÄ´Ócali0Éè±¸·¢³ö
-6. ±¨ÎÄÍ¨¹ývethÉè±¸½øÈëHost1ÄÚºËÐ­ÒéÕ»£»
-7. ÓÉÓÚÄ¿µÄIP²»ÔÚ±¾½Úµã£¬Host1ÄÚºË»á½øÐÐ±¨ÎÄ×ª·¢£¨ip_forwardÒÑ¿ªÆô£©
-8. Host1ÄÚºË²éÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýÏÂÒ»Ìø192.168.0.102£¨Host2£©¿ÉÒÔµ½´ï£¬¶ø192.168.0.102¿ÉÒÔÖ±´ï
-9. HostÄÚºË·¢ËÍARPÇëÇó¸øHost2£¬Í¨¹ýeth0Éè±¸·¢³ö
-10. ARPÇëÇó±¨ÎÄÍ¨¹ýµ×²ãÍøÂçµ½´ïHost2£¬Host2ÏìÓ¦ARPÇëÇó£¬Í¨¹ýµ×²ãÍøÂçµ½´ïHost1
-11. Host1ÄÚºË·¢ËÍ±¨ÎÄ¸øTUN10Éè±¸£¨ÒòÎªIPIPÊÇÈý²ãÉè±¸£¬²»ÐèÒª¶þ²ãÍ·£¬ËùÒÔ²»»áÏò192.168.0.102·¢ËÍARPÇëÇó£©
-12. IPIPÉè±¸·â×°Íâ²ãIPÍ·£¨IPIPÉè±¸ÊÇ¶Ëµ½¶ËÉè±¸£¬´´½¨Ê±Ö¸¶¨ÁË¶Ô¶Ë£©
-13. IPIPÉè±¸·â×°Íâ²ãMACÍ·£¬²¢´Óeth0·¢³ö±¨ÎÄ
-14. Host2½ÓÊÕµ½IPIP±¨ÎÄ£¬½»¸øipipÐ­Òé½øÐÐÊÕ°ü´¦Àí
-15. ipipÐ­Òé´¦ÀíÍê³Éºó£¬×îÖÕ½øÐÐip_forward´¦Àí
-16. Host2²éÕÒÂ·ÓÉ±í£¬·¢ÏÖÂ·ÓÉÌõÄ¿£¬Í¨¹ýcalifYYYYYÉè±¸¿ÉÒÔÖ±´ï
-17. Host2ÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷D£¬Í¨¹ýcalifYYYYYÉè±¸·¢³ö
-18. ARPÇëÇó±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷D£¬ÈÝÆ÷BÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ývethÉè±¸µ½´ïHost2ÄÚºË
-19. Host2ÄÚºË¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬´ÓcalifYYYYYÉè±¸·¢³ö
-20. ±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïÈÝÆ÷D
+> Hostçš„æœ¬åœ°è·¯ç”±åœ¨åˆ›å»ºå®¹å™¨çš„æ—¶å€™å°±èƒ½å¤Ÿå»ºç«‹ï¼Œä¸ä¾èµ–BGP
 
 
-### Calico IPIPÊý¾ÝÃæ×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ÓÉÓÚIPIPÎª¹ÜµÀÉè±¸£¬µ±½ÚµãÊýÁ¿Ôö¼ÓÊ±£¬IPIPÉè±¸Ò²Í¬²½Ôö¼Ó
-  * ¿ÉÒÔÊ¹ÓÃVXLANÉè±¸À´´úÌæIPIPÉè±¸£¬µ«ÊÇÐÔÄÜÓÐËðÊ§
-* ¶Ô½ÚµãÍâµÄÉè±¸£¬ÆÁ±ÎÁËÈÝÆ÷ÍøÂçÐÅÏ¢£¬¶Ôµ×²ãÍøÂçÎÞÒÀÀµ
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå†…çš„calic0è®¾å¤‡çš„æŽ©ç é•¿åº¦ä¸º32ï¼Œå³ä¸Žå®¹å™¨Bå±žäºŽä¸åŒç½‘ç»œï¼Œéœ€è¦é€šè¿‡ç½‘å…³è¿›è¡Œé€šä¿¡
+2. å®¹å™¨AæŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå­˜åœ¨defaultè·¯ç”±ï¼Œä¸‹ä¸€è·³ä¸º169.254.1.1ï¼Œä¸”169.254.1.1å¯é€šè¿‡cali0ç›´è¾¾
+3. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™169.254.1.1ï¼ŒARPè¯·æ±‚æŠ¥æ–‡åˆ°è¾¾vethè®¾å¤‡çš„å¦ä¸€ç«¯califXXXæŽ¥æ”¶
+4. ç”±äºŽcalifXXXè®¾å¤‡ä½¿èƒ½äº†ARP proxyï¼ŒLinuxå†…æ ¸ä¼šä»¥califXXXçš„MACåœ°å€æ¥å“åº”ARPè¯·æ±‚ï¼Œå¹¶ä»ŽcalifXXXå‘å‡ºï¼›
+5. å®¹å™¨Aæ”¶åˆ°ARPå“åº”åŽï¼Œå¾—åˆ°169.254.1.1çš„MACåœ°å€ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå‘é€æŠ¥æ–‡ç»™169.254.1.1ï¼ŒæŠ¥æ–‡ä»Žcali0è®¾å¤‡å‘å‡º
+6. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡è¿›å…¥Host1å†…æ ¸åè®®æ ˆï¼›
+7. ç”±äºŽç›®çš„IPä¸åœ¨æœ¬èŠ‚ç‚¹ï¼ŒHost1å†…æ ¸ä¼šè¿›è¡ŒæŠ¥æ–‡è½¬å‘ï¼ˆip_forwardå·²å¼€å¯ï¼‰
+8. Host1å†…æ ¸æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡ä¸‹ä¸€è·³192.168.0.102ï¼ˆHost2ï¼‰å¯ä»¥åˆ°è¾¾ï¼Œè€Œ192.168.0.102å¯ä»¥ç›´è¾¾
+9. Hostå†…æ ¸å‘é€ARPè¯·æ±‚ç»™Host2ï¼Œé€šè¿‡eth0è®¾å¤‡å‘å‡º
+10. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡åº•å±‚ç½‘ç»œåˆ°è¾¾Host2ï¼ŒHost2å“åº”ARPè¯·æ±‚ï¼Œé€šè¿‡åº•å±‚ç½‘ç»œåˆ°è¾¾Host1
+11. Host1å†…æ ¸å‘é€æŠ¥æ–‡ç»™TUN10è®¾å¤‡ï¼ˆå› ä¸ºIPIPæ˜¯ä¸‰å±‚è®¾å¤‡ï¼Œä¸éœ€è¦äºŒå±‚å¤´ï¼Œæ‰€ä»¥ä¸ä¼šå‘192.168.0.102å‘é€ARPè¯·æ±‚ï¼‰
+12. IPIPè®¾å¤‡å°è£…å¤–å±‚IPå¤´ï¼ˆIPIPè®¾å¤‡æ˜¯ç«¯åˆ°ç«¯è®¾å¤‡ï¼Œåˆ›å»ºæ—¶æŒ‡å®šäº†å¯¹ç«¯ï¼‰
+13. IPIPè®¾å¤‡å°è£…å¤–å±‚MACå¤´ï¼Œå¹¶ä»Žeth0å‘å‡ºæŠ¥æ–‡
+14. Host2æŽ¥æ”¶åˆ°IPIPæŠ¥æ–‡ï¼Œäº¤ç»™ipipåè®®è¿›è¡Œæ”¶åŒ…å¤„ç†
+15. ipipåè®®å¤„ç†å®ŒæˆåŽï¼Œæœ€ç»ˆè¿›è¡Œip_forwardå¤„ç†
+16. Host2æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°è·¯ç”±æ¡ç›®ï¼Œé€šè¿‡califYYYYYè®¾å¤‡å¯ä»¥ç›´è¾¾
+17. Host2å†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œé€šè¿‡califYYYYYè®¾å¤‡å‘å‡º
+18. ARPè¯·æ±‚æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨Dï¼Œå®¹å™¨Bå“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡vethè®¾å¤‡åˆ°è¾¾Host2å†…æ ¸
+19. Host2å†…æ ¸æ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œä»ŽcalifYYYYYè®¾å¤‡å‘å‡º
+20. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾å®¹å™¨D
+
+
+### Calico IPIPæ•°æ®é¢æ€»ç»“
+
+* ç”±äºŽIPIPä¸ºç®¡é“è®¾å¤‡ï¼Œå½“èŠ‚ç‚¹æ•°é‡å¢žåŠ æ—¶ï¼ŒIPIPè®¾å¤‡ä¹ŸåŒæ­¥å¢žåŠ 
+  * å¯ä»¥ä½¿ç”¨VXLANè®¾å¤‡æ¥ä»£æ›¿IPIPè®¾å¤‡ï¼Œä½†æ˜¯æ€§èƒ½æœ‰æŸå¤±
+* å¯¹èŠ‚ç‚¹å¤–çš„è®¾å¤‡ï¼Œå±è”½äº†å®¹å™¨ç½‘ç»œä¿¡æ¯ï¼Œå¯¹åº•å±‚ç½‘ç»œæ— ä¾èµ–
 

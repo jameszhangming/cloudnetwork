@@ -1,112 +1,112 @@
-# FlannelÈÝÆ÷ÍøÂç·½°¸
+# Flannelå®¹å™¨ç½‘ç»œæ–¹æ¡ˆ
 
-Flannel¹²ÓÐÈý¸öÈÝÆ÷ÍøÂç·½°¸£ºFlannel UDP¡¢Flannel VXLAN¾ÉºÍFlannel VXLANÐÂ¡£
+Flannelå…±æœ‰ä¸‰ä¸ªå®¹å™¨ç½‘ç»œæ–¹æ¡ˆï¼šFlannel UDPã€Flannel VXLANæ—§å’ŒFlannel VXLANæ–°ã€‚
 
-## Flannel UDP·½°¸
+## Flannel UDPæ–¹æ¡ˆ
 
-Flannel UDPÊý¾ÝÃæÈçÏÂ£º
+Flannel UDPæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![flannel-udp](images/flannel-udp.png "flannel-udp")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬br0½»»»»úflood¸ÃARPÇëÇó
-3. ÈÝÆ÷B½ÓÊÕµ½ARPÇëÇó£¬²¢ÏìÓ¦
-4. br0½»»»»úflood¸ÃARPÏìÓ¦
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. br0½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AºÍÈÝÆ÷DÔÚ²»Í¬ÍøÂç£¬Í¨¹ýÍø¹Ø×ª·¢
-2. ÈÝÆ÷A·¢ËÍARPÇëÇó¸øÍø¹Ø£¨10.10.1.1£©
-3. ½Úµã1ÄÚºËÏìÓ¦ARPÇëÇó£¬²¢·¢ËÍµ½br0¿Ú
-4. br0½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-5. ÈÝÆ÷AÊÕµ½ARPÇëÇó£¬·â×°¶þ²ã±¨ÎÄ£¨Ä¿µÄMACÎªÍø¹ØµÄMAC£©£¬²¢·¢³ö±¨ÎÄ
-6. ±¨ÎÄÍ¨¹ývethÉè±¸µ½´ïbr0£¬²¢Í¨¹ýbr0½Ó¿ÚÉÏËÍÖÁ½ÚµãÄÚºË
-7. Host1ÄÚºË¸ù¾Ý±¨ÎÄÄ¿µÄIPµØÖ·£¬ÅÐ¶ÏÐèÒªÂ·ÓÉ×ª·¢£¬²éÕÒÂ·ÓÉ±í²¢Æ¥Åä£¬Í¨¹ýtunXÉè±¸Ö±½ÓËÍ´ï
-8. Host1ÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷D£¬²¢·¢ËÍµ½tunXÉè±¸ÉÏ
-9. flanneld´´½¨ÁËtunXÉè±¸µÄsocket£¬flannedÊÕµ½ARPÇëÇó±¨ÎÄ
-10. flanneldÏìÓ¦ARPÇëÇó£¬²¢Í¨¹ýtunX socket·¢ËÍARPÏìÓ¦£¬¸ÃÏìÓ¦±¨ÎÄ»á±»tunXÉè±¸½ÓÊÕ²¢½øÈëÐ­ÒéÕ»
-11. Host1ÄÚºËÊÕµ½ARPÏìÓ¦ºó£¬ÐÞ¸Ä±¨ÎÄ¶þ²ãÍ·£¬²¢·¢ËÍ¸øtunXXÉè±¸
-12. flanneldÊÕµ½¸Ã±¨ÎÄ£¬²¢¸ù¾ÝÍØÆËÐÅÏ¢£¬°Ñ¸Ã±¨ÎÄ·â×°ÔÚUDPÖÐ£¬flanneld·¢ËÍUDP±¨ÎÄ¸øHost2
-13. Host2½ÓÊÕµ½UDP±¨ÎÄ£¬¾­¹ýÐ­ÒéÕ»ÉÏËÍ¸øflanneld½ø³Ì
-14. flanneld½â·âÍâ²ã±¨ÎÄ£¬²¢°ÑÄÚ²ã±¨ÎÄÍ¨¹ýtunXXÉè±¸·¢ËÍ¸øÄÚºË
-15. Host2ÄÚºË¸ù¾Ý±¨ÎÄµÄÄ¿µÄIPµØÖ·£¬²éÕÒÂ·ÓÉ£¬·¢ÏÖÍ¨¹ýbr0¿ÉÒÔÖ±´ï
-16. Host2ÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷D£¬²¢·¢ËÍ¸øbr0½Ó¿Ú
-17. br0½»»»»ú×ª·¢ARPÇëÇó¸øÈÝÆ÷D£¬ÈÝÆ÷DÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ýbr0½Ó¿ÚÉÏËÍµ½Ð­ÒéÕ»
-18. Host2ÄÚºË¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬²¢·¢ËÍ±¨ÎÄµ½br0½Ó¿Ú
-19. br0½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
-20. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
-
-flanneld½ÓÊÕµ½ARPÇëÇóºóÈçºÎÏìÓ¦£¬ÓÐÁ½ÖÖ×ö·¨£º
-
-* ÒÔ¶Ô¶ËtunXXÉè±¸µÄMACµØÖ·ÏìÓ¦
-* ¹Ì¶¨tunXXÉè±¸µÄMACµØÖ·£¬²¢ÇÒÒÔ¸ÃµØÖ·À´ÏìÓ¦
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œbr0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+3. å®¹å™¨BæŽ¥æ”¶åˆ°ARPè¯·æ±‚ï¼Œå¹¶å“åº”
+4. br0äº¤æ¢æœºfloodè¯¥ARPå“åº”
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. br0äº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### Flannel UDP·½°¸×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ÍøÂçÐÔÄÜ²î
-  * Ê¹ÓÃsocket»úÖÆ±¨ÎÄ×ª·¢¹ý³ÌÖÐ£¬»á´ÓÄÚºËÌ¬ÇÐ»»µ½ÓÃ»§Ì¬£»
-  * ¶ÔÊý¾Ý½øÐÐÁËÍâ²ã·â×°£¬ÄÚºË¶ÔUDP·â×°Ã»ÓÐÓÅ»¯£»
-* ¿ÉÒÔÖ§³ÖÊý¾Ý¼ÓÃÜ
-  * flanneld¿ÉÒÔ×öºÜ¶à¶¨ÖÆ»¯µÄ¹¤×÷£¬ÈÝÒ×À©Õ¹
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå’Œå®¹å™¨Dåœ¨ä¸åŒç½‘ç»œï¼Œé€šè¿‡ç½‘å…³è½¬å‘
+2. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™ç½‘å…³ï¼ˆ10.10.1.1ï¼‰
+3. èŠ‚ç‚¹1å†…æ ¸å“åº”ARPè¯·æ±‚ï¼Œå¹¶å‘é€åˆ°br0å£
+4. br0äº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+5. å®¹å™¨Aæ”¶åˆ°ARPè¯·æ±‚ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼ˆç›®çš„MACä¸ºç½‘å…³çš„MACï¼‰ï¼Œå¹¶å‘å‡ºæŠ¥æ–‡
+6. æŠ¥æ–‡é€šè¿‡vethè®¾å¤‡åˆ°è¾¾br0ï¼Œå¹¶é€šè¿‡br0æŽ¥å£ä¸Šé€è‡³èŠ‚ç‚¹å†…æ ¸
+7. Host1å†…æ ¸æ ¹æ®æŠ¥æ–‡ç›®çš„IPåœ°å€ï¼Œåˆ¤æ–­éœ€è¦è·¯ç”±è½¬å‘ï¼ŒæŸ¥æ‰¾è·¯ç”±è¡¨å¹¶åŒ¹é…ï¼Œé€šè¿‡tunXè®¾å¤‡ç›´æŽ¥é€è¾¾
+8. Host1å†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œå¹¶å‘é€åˆ°tunXè®¾å¤‡ä¸Š
+9. flanneldåˆ›å»ºäº†tunXè®¾å¤‡çš„socketï¼Œflannedæ”¶åˆ°ARPè¯·æ±‚æŠ¥æ–‡
+10. flanneldå“åº”ARPè¯·æ±‚ï¼Œå¹¶é€šè¿‡tunX socketå‘é€ARPå“åº”ï¼Œè¯¥å“åº”æŠ¥æ–‡ä¼šè¢«tunXè®¾å¤‡æŽ¥æ”¶å¹¶è¿›å…¥åè®®æ ˆ
+11. Host1å†…æ ¸æ”¶åˆ°ARPå“åº”åŽï¼Œä¿®æ”¹æŠ¥æ–‡äºŒå±‚å¤´ï¼Œå¹¶å‘é€ç»™tunXXè®¾å¤‡
+12. flanneldæ”¶åˆ°è¯¥æŠ¥æ–‡ï¼Œå¹¶æ ¹æ®æ‹“æ‰‘ä¿¡æ¯ï¼ŒæŠŠè¯¥æŠ¥æ–‡å°è£…åœ¨UDPä¸­ï¼Œflanneldå‘é€UDPæŠ¥æ–‡ç»™Host2
+13. Host2æŽ¥æ”¶åˆ°UDPæŠ¥æ–‡ï¼Œç»è¿‡åè®®æ ˆä¸Šé€ç»™flanneldè¿›ç¨‹
+14. flanneldè§£å°å¤–å±‚æŠ¥æ–‡ï¼Œå¹¶æŠŠå†…å±‚æŠ¥æ–‡é€šè¿‡tunXXè®¾å¤‡å‘é€ç»™å†…æ ¸
+15. Host2å†…æ ¸æ ¹æ®æŠ¥æ–‡çš„ç›®çš„IPåœ°å€ï¼ŒæŸ¥æ‰¾è·¯ç”±ï¼Œå‘çŽ°é€šè¿‡br0å¯ä»¥ç›´è¾¾
+16. Host2å†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œå¹¶å‘é€ç»™br0æŽ¥å£
+17. br0äº¤æ¢æœºè½¬å‘ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œå®¹å™¨Då“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡br0æŽ¥å£ä¸Šé€åˆ°åè®®æ ˆ
+18. Host2å†…æ ¸æ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œå¹¶å‘é€æŠ¥æ–‡åˆ°br0æŽ¥å£
+19. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+20. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
+
+flanneldæŽ¥æ”¶åˆ°ARPè¯·æ±‚åŽå¦‚ä½•å“åº”ï¼Œæœ‰ä¸¤ç§åšæ³•ï¼š
+
+* ä»¥å¯¹ç«¯tunXXè®¾å¤‡çš„MACåœ°å€å“åº”
+* å›ºå®štunXXè®¾å¤‡çš„MACåœ°å€ï¼Œå¹¶ä¸”ä»¥è¯¥åœ°å€æ¥å“åº”
 
 
-## Flannel VXLAN¾É°æ·½°¸
+### Flannel UDPæ–¹æ¡ˆæ€»ç»“
 
-Flannel VXLAN¾É°æÊý¾ÝÃæÈçÏÂ£º
+* ç½‘ç»œæ€§èƒ½å·®
+  * ä½¿ç”¨socketæœºåˆ¶æŠ¥æ–‡è½¬å‘è¿‡ç¨‹ä¸­ï¼Œä¼šä»Žå†…æ ¸æ€åˆ‡æ¢åˆ°ç”¨æˆ·æ€ï¼›
+  * å¯¹æ•°æ®è¿›è¡Œäº†å¤–å±‚å°è£…ï¼Œå†…æ ¸å¯¹UDPå°è£…æ²¡æœ‰ä¼˜åŒ–ï¼›
+* å¯ä»¥æ”¯æŒæ•°æ®åŠ å¯†
+  * flanneldå¯ä»¥åšå¾ˆå¤šå®šåˆ¶åŒ–çš„å·¥ä½œï¼Œå®¹æ˜“æ‰©å±•
+
+
+## Flannel VXLANæ—§ç‰ˆæ–¹æ¡ˆ
+
+Flannel VXLANæ—§ç‰ˆæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![flannel-vxlan-old](images/flannel-vxlan-old.png "flannel-vxlan-old")
 
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨Í¬Flannel UDP£©£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆåŒFlannel UDPï¼‰ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬br0½»»»»úflood¸ÃARPÇëÇó
-3. ÈÝÆ÷B½ÓÊÕµ½ARPÇëÇó£¬²¢ÏìÓ¦
-4. br0½»»»»úflood¸ÃARPÏìÓ¦
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. br0½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AºÍÈÝÆ÷DÔÚÍ¬Ò»¸öÍøÂç
-2. ÈÝÆ÷AÖ±½Ó·¢ËÍARPÇëÇó
-3. br0½»»»»úflood ARPÇëÇó
-4. vxlanÉè±¸½ÓÊÕµ½ARPÇëÇó
-5. ÓÉÓÚvxlanÉè±¸ÅäÖÃÁËarp proxy£¬²éÕÒÄÚºËARP±íÏî£¬Èç¹ûÎ´ÕÒµ½£¬ÔòÉÏ±¨L3MISS
-6. flanneld½ÓÊÕµ½L3MISS£¬¸ù¾ÝÍØÆËÐÅÏ¢ÏòÄÚºËÖÐÌí¼ÓARP±íÏî
-7. ÈÝÆ÷AÓÉÓÚÎ´ÊÕµ½ARPÏìÓ¦£¬½«»áÔÙ´Î·¢ËÍARPÇëÇó£¬´ËÊ±vxlanÉè±¸ÄÜ¹»ÏìÓ¦¸ÃARPÇëÇó£¨ÄÚºËÒÑÌí¼Ó¸ÃARP±íÏî£©
-8. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ£¬²¢·¢ËÍ
-9. br0×ª·¢¸Ã±¨ÎÄµ½vxlan¶Ë¿Ú
-10. vxlan·â×°Íâ²ãvxlanÍ·£¬udpÍ·£¬IPÍ·£¬macÍ·£¬ÆäÖÐÄ¿µÄIPÐèÒª¸ù¾ÝÄÚ²ã±¨ÎÄÄ¿µÄMACÀ´»ñÈ¡
-11. vxlanÉè±¸ÔÚÄÚºËFDB×ª·¢±í²éÕÒÄ¿µÄMACµÄ×ª·¢Ïî£¬Î´ÕÒµ½£¬ÔòÉÏ±¨L2MISS
-12. flanneld½ÓÊÕµ½L2MISSÐÅÏ¢£¬¸ù¾ÝÍØÆËÐÅÏ¢£¬ÏòÄÚºËÖÐÌí¼ÓFDB±íÏî
-13. ´Ë±¨ÎÄÎ´³É¹¦·¢ËÍ£¬ÈÝÆ÷AÖØ·¢±¨ÎÄ
-14. vxlanÉè±¸´ËÊ±ÄÜ¹»ÕýÈ·µØ·â×°Íâ²ã±¨ÎÄ£¬²¢·¢ËÍ±¨ÎÄ
-15. Host2½ÓÊÕµ½±¨ÎÄ£¬Í¨¹ýUDP Socket£¬²¢½øÈëµ½VXLAN½â°ü´¦Àí£¬×îÖÕ×÷ÎªvxlanÉè±¸ÊÕ°ü´¦Àí£¬vxlanÉè±¸¹ÒÔØµ½br0½»»»»ú
-16. br0½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œbr0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+3. å®¹å™¨BæŽ¥æ”¶åˆ°ARPè¯·æ±‚ï¼Œå¹¶å“åº”
+4. br0äº¤æ¢æœºfloodè¯¥ARPå“åº”
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. br0äº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-ÓÉÓÚL3MISSºÍL2MISSºÎÊ±ÉÏ±¨ÓëÍøÉÏµÄÎÄµµ¸ÕºÃÏà·´£¬´úÂëÊÇ×îÓÐËµ·þÁ¦µÄ£¬ÈçÏÂÊÇVXLANÉè±¸´¦ÀíARPÇëÇóµÄ´úÂëÆ¬¶Î£º
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
+
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå’Œå®¹å™¨Dåœ¨åŒä¸€ä¸ªç½‘ç»œ
+2. å®¹å™¨Aç›´æŽ¥å‘é€ARPè¯·æ±‚
+3. br0äº¤æ¢æœºflood ARPè¯·æ±‚
+4. vxlanè®¾å¤‡æŽ¥æ”¶åˆ°ARPè¯·æ±‚
+5. ç”±äºŽvxlanè®¾å¤‡é…ç½®äº†arp proxyï¼ŒæŸ¥æ‰¾å†…æ ¸ARPè¡¨é¡¹ï¼Œå¦‚æžœæœªæ‰¾åˆ°ï¼Œåˆ™ä¸ŠæŠ¥L3MISS
+6. flanneldæŽ¥æ”¶åˆ°L3MISSï¼Œæ ¹æ®æ‹“æ‰‘ä¿¡æ¯å‘å†…æ ¸ä¸­æ·»åŠ ARPè¡¨é¡¹
+7. å®¹å™¨Aç”±äºŽæœªæ”¶åˆ°ARPå“åº”ï¼Œå°†ä¼šå†æ¬¡å‘é€ARPè¯·æ±‚ï¼Œæ­¤æ—¶vxlanè®¾å¤‡èƒ½å¤Ÿå“åº”è¯¥ARPè¯·æ±‚ï¼ˆå†…æ ¸å·²æ·»åŠ è¯¥ARPè¡¨é¡¹ï¼‰
+8. å®¹å™¨Aæ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå¹¶å‘é€
+9. br0è½¬å‘è¯¥æŠ¥æ–‡åˆ°vxlanç«¯å£
+10. vxlanå°è£…å¤–å±‚vxlanå¤´ï¼Œudpå¤´ï¼ŒIPå¤´ï¼Œmacå¤´ï¼Œå…¶ä¸­ç›®çš„IPéœ€è¦æ ¹æ®å†…å±‚æŠ¥æ–‡ç›®çš„MACæ¥èŽ·å–
+11. vxlanè®¾å¤‡åœ¨å†…æ ¸FDBè½¬å‘è¡¨æŸ¥æ‰¾ç›®çš„MACçš„è½¬å‘é¡¹ï¼Œæœªæ‰¾åˆ°ï¼Œåˆ™ä¸ŠæŠ¥L2MISS
+12. flanneldæŽ¥æ”¶åˆ°L2MISSä¿¡æ¯ï¼Œæ ¹æ®æ‹“æ‰‘ä¿¡æ¯ï¼Œå‘å†…æ ¸ä¸­æ·»åŠ FDBè¡¨é¡¹
+13. æ­¤æŠ¥æ–‡æœªæˆåŠŸå‘é€ï¼Œå®¹å™¨Aé‡å‘æŠ¥æ–‡
+14. vxlanè®¾å¤‡æ­¤æ—¶èƒ½å¤Ÿæ­£ç¡®åœ°å°è£…å¤–å±‚æŠ¥æ–‡ï¼Œå¹¶å‘é€æŠ¥æ–‡
+15. Host2æŽ¥æ”¶åˆ°æŠ¥æ–‡ï¼Œé€šè¿‡UDP Socketï¼Œå¹¶è¿›å…¥åˆ°VXLANè§£åŒ…å¤„ç†ï¼Œæœ€ç»ˆä½œä¸ºvxlanè®¾å¤‡æ”¶åŒ…å¤„ç†ï¼Œvxlanè®¾å¤‡æŒ‚è½½åˆ°br0äº¤æ¢æœº
+16. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+
+
+ç”±äºŽL3MISSå’ŒL2MISSä½•æ—¶ä¸ŠæŠ¥ä¸Žç½‘ä¸Šçš„æ–‡æ¡£åˆšå¥½ç›¸åï¼Œä»£ç æ˜¯æœ€æœ‰è¯´æœåŠ›çš„ï¼Œå¦‚ä¸‹æ˜¯VXLANè®¾å¤‡å¤„ç†ARPè¯·æ±‚çš„ä»£ç ç‰‡æ®µï¼š
 
 ```    
-	n = neigh_lookup(&arp_tbl, &tip, dev);	//²éÕÒ±¾µØARP±íÏî
+	n = neigh_lookup(&arp_tbl, &tip, dev);	//æŸ¥æ‰¾æœ¬åœ°ARPè¡¨é¡¹
 
 	if (n) {
 		struct vxlan_fdb *f;
@@ -126,10 +126,10 @@ Flannel VXLAN¾É°æÊý¾ÝÃæÈçÏÂ£º
 	}
 ```    
 
-ÈçÏÂ´úÂëÊÇVXLANÉè±¸·â×°Íâ²ãIPÍ·Ê±£¬»ñÈ¡Ä¿µÄIPµÄ´úÂëÆ¬¶Î£º
+å¦‚ä¸‹ä»£ç æ˜¯VXLANè®¾å¤‡å°è£…å¤–å±‚IPå¤´æ—¶ï¼ŒèŽ·å–ç›®çš„IPçš„ä»£ç ç‰‡æ®µï¼š
 
 ```    
-	f = vxlan_find_mac(vxlan, eth->h_dest);  //ÒÔÄ¿µÄmac²éÕÒFDB±í
+	f = vxlan_find_mac(vxlan, eth->h_dest);  //ä»¥ç›®çš„macæŸ¥æ‰¾FDBè¡¨
 	did_rsc = false;
 
 	if (f && (f->flags & NTF_ROUTER) && (vxlan->flags & VXLAN_F_RSC) &&
@@ -141,11 +141,11 @@ Flannel VXLAN¾É°æÊý¾ÝÃæÈçÏÂ£º
 	}
 
 	if (f == NULL) {
-		f = vxlan_find_mac(vxlan, all_zeros_mac);  //ÒÔÈ«Áãmac²éÕÒFDB±í
+		f = vxlan_find_mac(vxlan, all_zeros_mac);  //ä»¥å…¨é›¶macæŸ¥æ‰¾FDBè¡¨
 		if (f == NULL) {
 			if ((vxlan->flags & VXLAN_F_L2MISS) &&
 			    !is_multicast_ether_addr(eth->h_dest))
-				vxlan_fdb_miss(vxlan, eth->h_dest);	    //ÉÏ±¨L2MISS
+				vxlan_fdb_miss(vxlan, eth->h_dest);	    //ä¸ŠæŠ¥L2MISS
 
 			dev->stats.tx_dropped++;
 			kfree_skb(skb);
@@ -154,66 +154,66 @@ Flannel VXLAN¾É°æÊý¾ÝÃæÈçÏÂ£º
 	}
 ```    
 
-### Flannel VXLAN¾É°æ·½°¸×Ü½á
+### Flannel VXLANæ—§ç‰ˆæ–¹æ¡ˆæ€»ç»“
 
-* ²ÉÓÃL2MISSºÍL3MISS»úÖÆ£¬Ê×°ü½«»á±»¶ªÆú£¬ÑÏÖØÓ°ÏìÊ×°üµÄÑÓÊ±
-* L2MISSºÍL3MISS²ÉÓÃnetwork link»úÖÆ£¬ÐÔÄÜµÍ
-* ÈÝÆ÷Îª´ó¶þ²ãÍøÂç£¬²»Ö§³Ö¶à¸öÍøÂç
-* ¶Ô½ÚµãÍøÂçÎÞÒÀÀµ£¨ÒÑ¾­±»·â×°µ½½ÚµãÍøÂç£©
-* ½öÐèÒªÒ»¸övtepÉè±¸£¬Í¨¹ýFDB±íÈ·¶¨Ä¿±êvtepÉè±¸
-* Ã¿¸öÈÝÆ÷ÓÐÒ»ÌõARP¼ÇÂ¼£¬´ó¹æÄ£Ê±½ÚµãÉÏµÄARP±íÏî¹ý¶à
-* FDB¼ÇÂ¼ÊýÓëÈÝÆ÷ÊýÁ¿³ÉÕý±È£¬´ó¹æÄ£Ê±½ÚµãÉÏµÄFDB±íÏî¹ý¶à
+* é‡‡ç”¨L2MISSå’ŒL3MISSæœºåˆ¶ï¼Œé¦–åŒ…å°†ä¼šè¢«ä¸¢å¼ƒï¼Œä¸¥é‡å½±å“é¦–åŒ…çš„å»¶æ—¶
+* L2MISSå’ŒL3MISSé‡‡ç”¨network linkæœºåˆ¶ï¼Œæ€§èƒ½ä½Ž
+* å®¹å™¨ä¸ºå¤§äºŒå±‚ç½‘ç»œï¼Œä¸æ”¯æŒå¤šä¸ªç½‘ç»œ
+* å¯¹èŠ‚ç‚¹ç½‘ç»œæ— ä¾èµ–ï¼ˆå·²ç»è¢«å°è£…åˆ°èŠ‚ç‚¹ç½‘ç»œï¼‰
+* ä»…éœ€è¦ä¸€ä¸ªvtepè®¾å¤‡ï¼Œé€šè¿‡FDBè¡¨ç¡®å®šç›®æ ‡vtepè®¾å¤‡
+* æ¯ä¸ªå®¹å™¨æœ‰ä¸€æ¡ARPè®°å½•ï¼Œå¤§è§„æ¨¡æ—¶èŠ‚ç‚¹ä¸Šçš„ARPè¡¨é¡¹è¿‡å¤š
+* FDBè®°å½•æ•°ä¸Žå®¹å™¨æ•°é‡æˆæ­£æ¯”ï¼Œå¤§è§„æ¨¡æ—¶èŠ‚ç‚¹ä¸Šçš„FDBè¡¨é¡¹è¿‡å¤š
 
 
-## Flannel VXLANÐÂ°æ·½°¸
+## Flannel VXLANæ–°ç‰ˆæ–¹æ¡ˆ
 
-Flannel VXLANÐÂ°æÊý¾ÝÃæÈçÏÂ£º
+Flannel VXLANæ–°ç‰ˆæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![flannel-vxlan-new](images/flannel-vxlan-new.png "flannel-vxlan-new")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨Í¬Flannel UDP£©£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆåŒFlannel UDPï¼‰ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬br0½»»»»úflood¸ÃARPÇëÇó
-3. ÈÝÆ÷B½ÓÊÕµ½ARPÇëÇó£¬²¢ÏìÓ¦
-4. br0½»»»»úflood¸ÃARPÏìÓ¦
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. br0½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œbr0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+3. å®¹å™¨BæŽ¥æ”¶åˆ°ARPè¯·æ±‚ï¼Œå¹¶å“åº”
+4. br0äº¤æ¢æœºfloodè¯¥ARPå“åº”
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. br0äº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷DÔÚ²»Í¬ÍøÂç£¬Í¨¹ýÍø¹Ø×ª·¢
-2. ÈÝÆ÷A·¢ËÍARPÇëÇó¸øÍø¹Ø£¨10.10.1.1£©
-3. ½Úµã1ÄÚºËÏìÓ¦ARPÇëÇó£¬²¢·¢ËÍµ½br0½Ó¿Ú
-4. br0½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-5. ÈÝÆ÷AÊÕµ½ARPÇëÇó£¬·â×°¶þ²ã±¨ÎÄ£¨Ä¿µÄMACÎªÍø¹ØµÄMAC£©£¬²¢·¢³ö±¨ÎÄ
-6. br0½»»»»ú×ª·¢±¨ÎÄ¸øbr0½Ó¿Ú£¬²¢½øÈëµ½Ð­ÒéÕ»
-7. Host1ÄÚºË²éÕÒÂ·ÓÉ±í£¬ÐèÒª10.10.2.0×ª·¢£¬²¢ÇÒÊÇÍ¨¹ývtep0Éè±¸
-8. Host1ÄÚºË²éÕÒARP±íÏî£¬·¢ÏÖÁË10.10.2.0µÄMAC±íÏî£¬Ö±½Ó·â×°¶þ²ã±¨ÎÄ£¬²¢·¢ËÍµ½vtep0Éè±¸
-9. vtep0Éè±¸²éÕÒFDB±í£¬·¢ÏÖ10.10.2.0MACµÄ±íÏî
-10. vtep0·â×°Íâ²ãvxlanÍ·£¬udpÍ·£¬ipÍ·£¬macÍ·£¨ÓÉÓÚ½ÚµãÔÚÍ¬Ò»¸öÍøÂç£¬mac¿ÉÒÔÍ¨¹ýARPÇëÇó»ñÈ¡£©
-11. vtep0·¢ËÍ±¨ÎÄ
-12. Host2½ÓÊÕµ½±¨ÎÄ£¬Í¨¹ýUDP Socket£¬²¢½øÈëµ½VXLAN½â°ü´¦Àí£¬×îÖÕÒÔvtep0ÊÕ°ü²¢½øÈëµ½Ð­ÒéÕ»
-13. Host2ÄÚºË²éÕÒÂ·ÓÉ±í£¬·¢ÏÖÍ¨¹ýbr0¿ÉÒÔÖ±½Óµ½´ï
-14. Host2ÄÚºË·¢ËÍARPÇëÇó¸øÈÝÆ÷D£¬²¢·¢ËÍ¸øbr0½Ó¿Ú
-15. br0½»»»»ú×ª·¢ARPÇëÇó¸øÈÝÆ÷D£¬ÈÝÆ÷DÏìÓ¦ARPÇëÇó£¬ARPÏìÓ¦Í¨¹ýbr0½Ó¿ÚÉÏËÍµ½Ð­ÒéÕ»
-16. Host2ÊÕµ½ARPÏìÓ¦£¬ÐÞ¸Ä±¨ÎÄµÄ¶þ²ãÍ·£¬²¢·¢ËÍµ½br0½Ó¿Ú
-17. br0½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
-18. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Dåœ¨ä¸åŒç½‘ç»œï¼Œé€šè¿‡ç½‘å…³è½¬å‘
+2. å®¹å™¨Aå‘é€ARPè¯·æ±‚ç»™ç½‘å…³ï¼ˆ10.10.1.1ï¼‰
+3. èŠ‚ç‚¹1å†…æ ¸å“åº”ARPè¯·æ±‚ï¼Œå¹¶å‘é€åˆ°br0æŽ¥å£
+4. br0äº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+5. å®¹å™¨Aæ”¶åˆ°ARPè¯·æ±‚ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡ï¼ˆç›®çš„MACä¸ºç½‘å…³çš„MACï¼‰ï¼Œå¹¶å‘å‡ºæŠ¥æ–‡
+6. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™br0æŽ¥å£ï¼Œå¹¶è¿›å…¥åˆ°åè®®æ ˆ
+7. Host1å†…æ ¸æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œéœ€è¦10.10.2.0è½¬å‘ï¼Œå¹¶ä¸”æ˜¯é€šè¿‡vtep0è®¾å¤‡
+8. Host1å†…æ ¸æŸ¥æ‰¾ARPè¡¨é¡¹ï¼Œå‘çŽ°äº†10.10.2.0çš„MACè¡¨é¡¹ï¼Œç›´æŽ¥å°è£…äºŒå±‚æŠ¥æ–‡ï¼Œå¹¶å‘é€åˆ°vtep0è®¾å¤‡
+9. vtep0è®¾å¤‡æŸ¥æ‰¾FDBè¡¨ï¼Œå‘çŽ°10.10.2.0MACçš„è¡¨é¡¹
+10. vtep0å°è£…å¤–å±‚vxlanå¤´ï¼Œudpå¤´ï¼Œipå¤´ï¼Œmacå¤´ï¼ˆç”±äºŽèŠ‚ç‚¹åœ¨åŒä¸€ä¸ªç½‘ç»œï¼Œmacå¯ä»¥é€šè¿‡ARPè¯·æ±‚èŽ·å–ï¼‰
+11. vtep0å‘é€æŠ¥æ–‡
+12. Host2æŽ¥æ”¶åˆ°æŠ¥æ–‡ï¼Œé€šè¿‡UDP Socketï¼Œå¹¶è¿›å…¥åˆ°VXLANè§£åŒ…å¤„ç†ï¼Œæœ€ç»ˆä»¥vtep0æ”¶åŒ…å¹¶è¿›å…¥åˆ°åè®®æ ˆ
+13. Host2å†…æ ¸æŸ¥æ‰¾è·¯ç”±è¡¨ï¼Œå‘çŽ°é€šè¿‡br0å¯ä»¥ç›´æŽ¥åˆ°è¾¾
+14. Host2å†…æ ¸å‘é€ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œå¹¶å‘é€ç»™br0æŽ¥å£
+15. br0äº¤æ¢æœºè½¬å‘ARPè¯·æ±‚ç»™å®¹å™¨Dï¼Œå®¹å™¨Då“åº”ARPè¯·æ±‚ï¼ŒARPå“åº”é€šè¿‡br0æŽ¥å£ä¸Šé€åˆ°åè®®æ ˆ
+16. Host2æ”¶åˆ°ARPå“åº”ï¼Œä¿®æ”¹æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œå¹¶å‘é€åˆ°br0æŽ¥å£
+17. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+18. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
-> ÆäÖÐÄ¿µÄvtepÉè±¸µÄMACµØÖ·£¬FDB±íÏî¶¼ÐèÒªflanneldÀ´Ô¤ÖÃ
+> å…¶ä¸­ç›®çš„vtepè®¾å¤‡çš„MACåœ°å€ï¼ŒFDBè¡¨é¡¹éƒ½éœ€è¦flanneldæ¥é¢„ç½®
 
-### Flannel VXLANÐÂ°æ·½°¸×Ü½á
+### Flannel VXLANæ–°ç‰ˆæ–¹æ¡ˆæ€»ç»“
 
-* Ã¿¸ö½Úµã·ÖÅäÒ»¸öÍøÂçCIDR
-* ²»Ö§³Ö´´½¨ÈÝÆ÷Ê±Ö¸¶¨IPµØÖ·
-* ½ÚµãµÄÂ·ÓÉ±íÊýÁ¿½ÏÉÙ£¬ºÍ½ÚµãÊý³ÉÕý±È
-* ¶Ô½ÚµãÍøÂçÎÞÒÀÀµ£¨ÒÑ¾­±»·â×°µ½½ÚµãÍøÂç£©
-* Ã¿¸ö½Úµã½öÐèÒªÒ»¸övtepÉè±¸£¬Í¨¹ýFDB±íÈ·¶¨Ä¿±êvtepÉè±¸
+* æ¯ä¸ªèŠ‚ç‚¹åˆ†é…ä¸€ä¸ªç½‘ç»œCIDR
+* ä¸æ”¯æŒåˆ›å»ºå®¹å™¨æ—¶æŒ‡å®šIPåœ°å€
+* èŠ‚ç‚¹çš„è·¯ç”±è¡¨æ•°é‡è¾ƒå°‘ï¼Œå’ŒèŠ‚ç‚¹æ•°æˆæ­£æ¯”
+* å¯¹èŠ‚ç‚¹ç½‘ç»œæ— ä¾èµ–ï¼ˆå·²ç»è¢«å°è£…åˆ°èŠ‚ç‚¹ç½‘ç»œï¼‰
+* æ¯ä¸ªèŠ‚ç‚¹ä»…éœ€è¦ä¸€ä¸ªvtepè®¾å¤‡ï¼Œé€šè¿‡FDBè¡¨ç¡®å®šç›®æ ‡vtepè®¾å¤‡
 

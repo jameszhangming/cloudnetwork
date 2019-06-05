@@ -1,51 +1,51 @@
-# macvlanÈÝÆ÷ÍøÂç·½°¸
+# macvlanå®¹å™¨ç½‘ç»œæ–¹æ¡ˆ
 
-macvlanÊÇLinux×Ô´øµÄÐéÄâÍø¿¨£¬»ùÓÚÍ¬Ò»¸öµ×²ãÍø¿¨µÄmacvlanÉè±¸»áÐÎ³ÉÒ»¸öÂß¼­µÄ½»»»»ú£¬Ìá¹©½»»»ÄÜÁ¦£¬ÐÔÄÜÓÅ»¯linux bridge¡£
+macvlanæ˜¯Linuxè‡ªå¸¦çš„è™šæ‹Ÿç½‘å¡ï¼ŒåŸºäºŽåŒä¸€ä¸ªåº•å±‚ç½‘å¡çš„macvlanè®¾å¤‡ä¼šå½¢æˆä¸€ä¸ªé€»è¾‘çš„äº¤æ¢æœºï¼Œæä¾›äº¤æ¢èƒ½åŠ›ï¼Œæ€§èƒ½ä¼˜åŒ–linux bridgeã€‚
 
-## macvlan·½°¸
+## macvlanæ–¹æ¡ˆ
 
-macvlanÊý¾ÝÃæÈçÏÂ£º
+macvlanæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![macvlan](images/macvlan.png "macvlan")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó
-3. macvlan½»»»»úflood ARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬»áÏìÓ¦ARPÇëÇó
-   2. eth0½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬Ïò½ÚµãÍøÂç·¢ËÍARPÇëÇó£¬µ«ÊÇ²¢Ã»ÓÐ½ÚµãÏìÓ¦
-4. macvlan½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-5. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-6. macvlan½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-7. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚
+3. macvlanäº¤æ¢æœºflood ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¼šå“åº”ARPè¯·æ±‚
+   2. eth0æŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œå‘èŠ‚ç‚¹ç½‘ç»œå‘é€ARPè¯·æ±‚ï¼Œä½†æ˜¯å¹¶æ²¡æœ‰èŠ‚ç‚¹å“åº”
+4. macvlanäº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+5. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+6. macvlanäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+7. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷DÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷D·¢ËÍARPÇëÇó
-3. macvlan½»»»»úflood ARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬²»»áÏìÓ¦ARPÇëÇó
-   2. eth0½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬Ïò½ÚµãÍøÂç·¢ËÍARPÇëÇó
-4. Host2½ÓÊÕµ½ARPÇëÇó
-5. macvlan½»»»»úflood¸ÃARPÇëÇó
-6. ÈÝÆ÷D½ÓÊÕµ½ARPÇëÇó£¬²¢ÏìÓ¦
-7. macvlan½»»»»ú×ª·¢ARPÏìÓ¦µ½eth0
-8. Host1½ÓÊÕµ½ARPÏìÓ¦
-9. macvlan½»»»»ú×ª·¢ARPÇëÇó¸øÈÝÆ÷A
-10. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-11. ÈÝÆ÷A·â×°±¨ÎÄ¶þ²ãÍ·£¬²¢·¢ËÍ
-12. macvlan½»»»»ú×ª·¢±¨ÎÄµ½eth0¿Ú
-13. Host2½ÓÊÕ´Ë±¨ÎÄ£¬macvlan½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
-14. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Dåœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Då‘é€ARPè¯·æ±‚
+3. macvlanäº¤æ¢æœºflood ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¸ä¼šå“åº”ARPè¯·æ±‚
+   2. eth0æŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œå‘èŠ‚ç‚¹ç½‘ç»œå‘é€ARPè¯·æ±‚
+4. Host2æŽ¥æ”¶åˆ°ARPè¯·æ±‚
+5. macvlanäº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+6. å®¹å™¨DæŽ¥æ”¶åˆ°ARPè¯·æ±‚ï¼Œå¹¶å“åº”
+7. macvlanäº¤æ¢æœºè½¬å‘ARPå“åº”åˆ°eth0
+8. Host1æŽ¥æ”¶åˆ°ARPå“åº”
+9. macvlanäº¤æ¢æœºè½¬å‘ARPè¯·æ±‚ç»™å®¹å™¨A
+10. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+11. å®¹å™¨Aå°è£…æŠ¥æ–‡äºŒå±‚å¤´ï¼Œå¹¶å‘é€
+12. macvlanäº¤æ¢æœºè½¬å‘æŠ¥æ–‡åˆ°eth0å£
+13. Host2æŽ¥æ”¶æ­¤æŠ¥æ–‡ï¼Œmacvlanäº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+14. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
-### macvlan·½°¸×Ü½á
+### macvlanæ–¹æ¡ˆæ€»ç»“
 
-* µäÐÍµÄ´ó¶þ²ãÍøÂç·½°¸£¬ÒÀÀµ½ÚµãÍøÂçÖ§³Ö¹ã²¥¹¦ÄÜ
-* ´¿¶þ²ãÈÝÆ÷ÍøÂç·½°¸£¬ÐÔÄÜ¼¸ºõÓëhostÍøÂç³ÖÆ½
+* å…¸åž‹çš„å¤§äºŒå±‚ç½‘ç»œæ–¹æ¡ˆï¼Œä¾èµ–èŠ‚ç‚¹ç½‘ç»œæ”¯æŒå¹¿æ’­åŠŸèƒ½
+* çº¯äºŒå±‚å®¹å™¨ç½‘ç»œæ–¹æ¡ˆï¼Œæ€§èƒ½å‡ ä¹Žä¸Žhostç½‘ç»œæŒå¹³
 

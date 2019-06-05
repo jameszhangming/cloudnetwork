@@ -1,105 +1,105 @@
-# WeaveÈÝÆ÷ÍøÂç·½°¸
+# Weaveå®¹å™¨ç½‘ç»œæ–¹æ¡ˆ
 
-Weave¹²ÓÐÁ½¸öÈÝÆ÷ÍøÂç·½°¸£ºWeave SleeveºÍWeave Fast Datapath¡£
+Weaveå…±æœ‰ä¸¤ä¸ªå®¹å™¨ç½‘ç»œæ–¹æ¡ˆï¼šWeave Sleeveå’ŒWeave Fast Datapathã€‚
 
-## Weave Sleeve·½°¸
+## Weave Sleeveæ–¹æ¡ˆ
 
-Weave SleeveÊý¾ÝÃæÈçÏÂ£º
+Weave Sleeveæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![weave-sleeve](images/weave-sleeve.png "weave-sleeve")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬weave½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬»áÏìÓ¦ARPÇëÇó
-   2. ethbr½Ó¿ÚÊÕµ½ARPÇëÇóºó
-      1. ÄÚºËÊÕµ½¸ÃARPÇëÇóºó£¬¼ì²éÄ¿±êIP²»ÊÇ±¾½Úµã£¬¶ªÆúARPÇëÇó
-	  2. Weave RouterÓÉÓÚ¼àÌý×Åethbr½Ó¿Ú£¬ÊÕµ½¸ÃARPÇëÇóºó£¬·¢ÏÖÊÇ±¾½ÚµãµÄÔò²»ÏìÓ¦ARPÇëÇó£¬Ö±½Ó¶ªÆú
-3. weave½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. weave½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬weave½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬²»»áÏìÓ¦ARPÇëÇó
-   2. ethbr½Ó¿ÚÊÕµ½ARPÇëÇóºó
-      1. ÄÚºËÊÕµ½¸ÃARPÇëÇóºó£¬¼ì²éÄ¿±êIP²»ÊÇ±¾½Úµã£¬¶ªÆúARPÇëÇó
-	  2. Weave RouterÓÉÓÚ¼àÌý×Åethbr½Ó¿Ú£¬ÊÕµ½¸ÃARPÇëÇóºó£¬·¢ÏÖÊÇÆäËû½ÚµãµÄ£¬¸ù¾ÝÐÅÏ¢·â×°ARPÏìÓ¦±¨ÎÄ£¬²¢·¢ËÍµ½ethbr½Ó¿Ú
-3. weave½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. weave½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ethbr½Ó¿Ú
-   1. ÄÚºËÊÕµ½¸Ã±¨ÎÄºó£¬½«¶ªÆú¸Ã±¨ÎÄ£¨±¨ÎÄµÄÄ¿µÄMAC·Çethbr½Ó¿ÚµÄMACµØÖ·£©
-   2. Weave RouterÓÉÓÚ¼àÌý×Åethbr½Ó¿Ú£¬ÊÕµ½¸Ã±¨ÎÄºó£¬·¢ÏÖÊÇÆäËû½ÚµãµÄ£¬Ôò½«¸Ã±¨ÎÄ·â×°µ½UDP±¨ÎÄÖÐ£¬²¢·¢ËÍµ½¶Ô¶ËWeave Router
-6. ½Úµã2½ÓÊÕµ½UDP±¨ÎÄ£¬²¢ÉÏËÍ¸øWeave Router½ø³Ì
-7. Weave Router½«±¨ÎÄ·¢ËÍµ½ethbr½Ó¿Ú
-8. weave½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷D
-9. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œweaveäº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¼šå“åº”ARPè¯·æ±‚
+   2. ethbræŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽ
+      1. å†…æ ¸æ”¶åˆ°è¯¥ARPè¯·æ±‚åŽï¼Œæ£€æŸ¥ç›®æ ‡IPä¸æ˜¯æœ¬èŠ‚ç‚¹ï¼Œä¸¢å¼ƒARPè¯·æ±‚
+	  2. Weave Routerç”±äºŽç›‘å¬ç€ethbræŽ¥å£ï¼Œæ”¶åˆ°è¯¥ARPè¯·æ±‚åŽï¼Œå‘çŽ°æ˜¯æœ¬èŠ‚ç‚¹çš„åˆ™ä¸å“åº”ARPè¯·æ±‚ï¼Œç›´æŽ¥ä¸¢å¼ƒ
+3. weaveäº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### Weave Sleeve·½°¸×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ²»ÒÀÀµetcdµÈ·Ö²¼Ê½×é¼þ
-* Ê¹ÓÃpcap½ÓÊÕÍøÂç±¨ÎÄ´æÔÚ±¨ÎÄ¿½ÎÊÎÊÌâ£¬ÐÔÄÜ²î
-* Êý¾Ý×ª·¢¹ý³Ì´æÔÚÒ»´ÎÄÚºËÌ¬ºÍÓÃ»§Ì¬Ö®¼äµÄÇÐ»»£¬ÐÔÄÜ²î
-* weave routerÖ®¼äÖ§³Ö¼ÓÃÜ£¬ÊÊÓÃÓÚinternet
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œweaveäº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¸ä¼šå“åº”ARPè¯·æ±‚
+   2. ethbræŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽ
+      1. å†…æ ¸æ”¶åˆ°è¯¥ARPè¯·æ±‚åŽï¼Œæ£€æŸ¥ç›®æ ‡IPä¸æ˜¯æœ¬èŠ‚ç‚¹ï¼Œä¸¢å¼ƒARPè¯·æ±‚
+	  2. Weave Routerç”±äºŽç›‘å¬ç€ethbræŽ¥å£ï¼Œæ”¶åˆ°è¯¥ARPè¯·æ±‚åŽï¼Œå‘çŽ°æ˜¯å…¶ä»–èŠ‚ç‚¹çš„ï¼Œæ ¹æ®ä¿¡æ¯å°è£…ARPå“åº”æŠ¥æ–‡ï¼Œå¹¶å‘é€åˆ°ethbræŽ¥å£
+3. weaveäº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°ethbræŽ¥å£
+   1. å†…æ ¸æ”¶åˆ°è¯¥æŠ¥æ–‡åŽï¼Œå°†ä¸¢å¼ƒè¯¥æŠ¥æ–‡ï¼ˆæŠ¥æ–‡çš„ç›®çš„MACéžethbræŽ¥å£çš„MACåœ°å€ï¼‰
+   2. Weave Routerç”±äºŽç›‘å¬ç€ethbræŽ¥å£ï¼Œæ”¶åˆ°è¯¥æŠ¥æ–‡åŽï¼Œå‘çŽ°æ˜¯å…¶ä»–èŠ‚ç‚¹çš„ï¼Œåˆ™å°†è¯¥æŠ¥æ–‡å°è£…åˆ°UDPæŠ¥æ–‡ä¸­ï¼Œå¹¶å‘é€åˆ°å¯¹ç«¯Weave Router
+6. èŠ‚ç‚¹2æŽ¥æ”¶åˆ°UDPæŠ¥æ–‡ï¼Œå¹¶ä¸Šé€ç»™Weave Routerè¿›ç¨‹
+7. Weave Routerå°†æŠ¥æ–‡å‘é€åˆ°ethbræŽ¥å£
+8. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨D
+9. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-## Weave Fast Datapath·½°¸
+### Weave Sleeveæ–¹æ¡ˆæ€»ç»“
 
-Weave Fast DatapathÊý¾ÝÃæÈçÏÂ£º
+* ä¸ä¾èµ–etcdç­‰åˆ†å¸ƒå¼ç»„ä»¶
+* ä½¿ç”¨pcapæŽ¥æ”¶ç½‘ç»œæŠ¥æ–‡å­˜åœ¨æŠ¥æ–‡æ‹·é—®é—®é¢˜ï¼Œæ€§èƒ½å·®
+* æ•°æ®è½¬å‘è¿‡ç¨‹å­˜åœ¨ä¸€æ¬¡å†…æ ¸æ€å’Œç”¨æˆ·æ€ä¹‹é—´çš„åˆ‡æ¢ï¼Œæ€§èƒ½å·®
+* weave routerä¹‹é—´æ”¯æŒåŠ å¯†ï¼Œé€‚ç”¨äºŽinternet
+
+
+## Weave Fast Datapathæ–¹æ¡ˆ
+
+Weave Fast Datapathæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![weave-fdp](images/weave-fdp.png "weave-fdp")
 
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨Í¬Flannel UDP£©£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆåŒFlannel UDPï¼‰ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬weave½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬»áÏìÓ¦ARPÇëÇó
-   2. ethbr½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬²¢×ª·¢³öÈ¥ºó£¬²»»áÓÐARPÏìÓ¦
-3. weave½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. weave½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
-
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬weave½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬²»»áÏìÓ¦ARPÇëÇó
-   2. ethbr½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬·¢ËÍµ½datapath½»»»»ú
-      * ²Â²â1£º datapath½»»»»úÉÏÅäÖÃARPÇëÇóµÄÁ÷±í£¬ÊÕµ½´ËÀàÇëÇóºó£¬ÉÏËÍÖÁcontroller£¬¼´Weave Router£¬Weave RouterÏÂ·¢Á÷±í
-	  * ²Â²â2£º datapath½»»»¿ÉÒÔÏìÓ¦Ò»¸ö¼ÙµÄMACµØÖ·£¬¸ÃMACµØÖ·µ½¶Ô¶ËµÄdatapath½»»»»úÉÏÐÞ¸Ä³ÉÕýÈ·µÄ
-	  * ²Â²â3£º datapathÖ±½Ó×ª·¢¸ÃARPÇëÇó£¬Í¨¹ývtepÉè±¸µ½´ï¶Ô¶Ë
-3. ÈÝÆ÷AÎ´ÊÕµ½ARPÏìÓ¦£¬¼ÌÐø·¢ËÍARPÇëÇó£¬´Ë´ÎÄÜ¹»ÊÕµ½ARPÏìÓ¦£¨±¾Êý¾ÝÁ÷°´ÕÕ²Â²â1À´½²Êö£¬Èç¹ûÊÇ²Â²â3¿ÉÒÔ²Î¿¼µÚ6²½µÄ´¦Àí£©
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. weave½»»»»úÖ±½Ó×ª·¢µ½ethbr£¬½øÈëµ½datapath½»»»»ú£¬½»»»»úflood±¨ÎÄ
-6. vtep½Ó¿ÚÊÕµ½±¨ÎÄ£¬ÐèÒª·â×°Íâ²ãVXLAN¡¢UDP¡¢IPºÍMACÍ·
-   * ºËÐÄÎÊÌâÊÇÕÒµ½¶Ô¶ËvtepµÄIPµØÖ·£¬vtepÉè±¸¿ªÆôÁËlearning£¬ËùÒÔ²Â²âÓÐÈýÖÖ×ö·¨:
-     1. Ê¹ÓÃ×é²¥£¬´´½¨vtepÉè±¸Ê±Ö¸¶¨×é²¥µØÖ·£¬µ±²»È·¶¨Ä¿µÄvtepÊ±£¬Í¨¹ý×é²¥·¢ËÍ±¨ÎÄ
-	 2. Ê¹ÓÃµ¥²¥£¬´´½¨vtepÉè±¸Ê±Ö¸¶¨ÆäËûµÄvtep
-	 3. Ê¹ÓÃµ¥²¥£¬´´½¨vtepÉè±¸Ê±²»Ö¸¶¨ÆäËûvtep£¬Í¨¹ýFDB±íÏîÖÐÌí¼ÓÈ«ÁãMACµØÖ·µÄ±íÏî£¬Ð§¹ûÍ¬2
-7. Host2ÊÕµ½±¨ÎÄ£¬ÉÏËÍµ½vtepÉè±¸£¬²¢½øÈëdatapath½»»»»ú£¬²¢flood¸Ã±¨ÎÄ
-8. ±¨ÎÄ¾­¹ýVethwe-datapath½øÈëweave½»»»»ú£¬²¢×ª·¢¸øÈÝÆ÷D
-9. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œweaveäº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¼šå“åº”ARPè¯·æ±‚
+   2. ethbræŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œå¹¶è½¬å‘å‡ºåŽ»åŽï¼Œä¸ä¼šæœ‰ARPå“åº”
+3. weaveäº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### Weave Fast Datapath·½°¸×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ²»ÒÀÀµetcdµÈ·Ö²¼Ê½×é¼þ
-* vxlan²ÉÓÃlearning»úÖÆ£¬²»ÊÊÓÃÓÚ´ó¹æÄ£³¡¾°
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
+
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œweaveäº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¸ä¼šå“åº”ARPè¯·æ±‚
+   2. ethbræŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œå‘é€åˆ°datapathäº¤æ¢æœº
+      * çŒœæµ‹1ï¼š datapathäº¤æ¢æœºä¸Šé…ç½®ARPè¯·æ±‚çš„æµè¡¨ï¼Œæ”¶åˆ°æ­¤ç±»è¯·æ±‚åŽï¼Œä¸Šé€è‡³controllerï¼Œå³Weave Routerï¼ŒWeave Routerä¸‹å‘æµè¡¨
+	  * çŒœæµ‹2ï¼š datapathäº¤æ¢å¯ä»¥å“åº”ä¸€ä¸ªå‡çš„MACåœ°å€ï¼Œè¯¥MACåœ°å€åˆ°å¯¹ç«¯çš„datapathäº¤æ¢æœºä¸Šä¿®æ”¹æˆæ­£ç¡®çš„
+	  * çŒœæµ‹3ï¼š datapathç›´æŽ¥è½¬å‘è¯¥ARPè¯·æ±‚ï¼Œé€šè¿‡vtepè®¾å¤‡åˆ°è¾¾å¯¹ç«¯
+3. å®¹å™¨Aæœªæ”¶åˆ°ARPå“åº”ï¼Œç»§ç»­å‘é€ARPè¯·æ±‚ï¼Œæ­¤æ¬¡èƒ½å¤Ÿæ”¶åˆ°ARPå“åº”ï¼ˆæœ¬æ•°æ®æµæŒ‰ç…§çŒœæµ‹1æ¥è®²è¿°ï¼Œå¦‚æžœæ˜¯çŒœæµ‹3å¯ä»¥å‚è€ƒç¬¬6æ­¥çš„å¤„ç†ï¼‰
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘åˆ°ethbrï¼Œè¿›å…¥åˆ°datapathäº¤æ¢æœºï¼Œäº¤æ¢æœºfloodæŠ¥æ–‡
+6. vtepæŽ¥å£æ”¶åˆ°æŠ¥æ–‡ï¼Œéœ€è¦å°è£…å¤–å±‚VXLANã€UDPã€IPå’ŒMACå¤´
+   * æ ¸å¿ƒé—®é¢˜æ˜¯æ‰¾åˆ°å¯¹ç«¯vtepçš„IPåœ°å€ï¼Œvtepè®¾å¤‡å¼€å¯äº†learningï¼Œæ‰€ä»¥çŒœæµ‹æœ‰ä¸‰ç§åšæ³•:
+     1. ä½¿ç”¨ç»„æ’­ï¼Œåˆ›å»ºvtepè®¾å¤‡æ—¶æŒ‡å®šç»„æ’­åœ°å€ï¼Œå½“ä¸ç¡®å®šç›®çš„vtepæ—¶ï¼Œé€šè¿‡ç»„æ’­å‘é€æŠ¥æ–‡
+	 2. ä½¿ç”¨å•æ’­ï¼Œåˆ›å»ºvtepè®¾å¤‡æ—¶æŒ‡å®šå…¶ä»–çš„vtep
+	 3. ä½¿ç”¨å•æ’­ï¼Œåˆ›å»ºvtepè®¾å¤‡æ—¶ä¸æŒ‡å®šå…¶ä»–vtepï¼Œé€šè¿‡FDBè¡¨é¡¹ä¸­æ·»åŠ å…¨é›¶MACåœ°å€çš„è¡¨é¡¹ï¼Œæ•ˆæžœåŒ2
+7. Host2æ”¶åˆ°æŠ¥æ–‡ï¼Œä¸Šé€åˆ°vtepè®¾å¤‡ï¼Œå¹¶è¿›å…¥datapathäº¤æ¢æœºï¼Œå¹¶floodè¯¥æŠ¥æ–‡
+8. æŠ¥æ–‡ç»è¿‡Vethwe-datapathè¿›å…¥weaveäº¤æ¢æœºï¼Œå¹¶è½¬å‘ç»™å®¹å™¨D
+9. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
+
+
+### Weave Fast Datapathæ–¹æ¡ˆæ€»ç»“
+
+* ä¸ä¾èµ–etcdç­‰åˆ†å¸ƒå¼ç»„ä»¶
+* vxlané‡‡ç”¨learningæœºåˆ¶ï¼Œä¸é€‚ç”¨äºŽå¤§è§„æ¨¡åœºæ™¯
 

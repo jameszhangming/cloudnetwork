@@ -1,118 +1,118 @@
-# DockerÔ­ÉúÈÝÆ÷ÍøÂç·½°¸
+# DockeråŽŸç”Ÿå®¹å™¨ç½‘ç»œæ–¹æ¡ˆ
 
-DockerÔ­Éú¹²ÓÐÁ½¸öÈÝÆ÷ÍøÂç·½°¸£ºDocker NATºÍDocker Overlay¡£
+DockeråŽŸç”Ÿå…±æœ‰ä¸¤ä¸ªå®¹å™¨ç½‘ç»œæ–¹æ¡ˆï¼šDocker NATå’ŒDocker Overlayã€‚
 
-## Docker NAT·½°¸
+## Docker NATæ–¹æ¡ˆ
 
-Docker NATÊý¾ÝÃæÈçÏÂ£º
+Docker NATæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![docker-nat](images/docker-nat.png "docker-nat")
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬docker0½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬»áÏìÓ¦ARPÇëÇó
-   2. docker0½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬ÎÞÏìÓ¦
-3. docker0½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. docker0½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Docker NATÄ£Ê½²»Ö§³ÖÈÝÆ÷Ö®¼äÖ®¼äÍ¨ÐÅ£¬ÐèÒªÍ¨¹ý°ÑµØÖ·×ª»¯Îª½ÚµãIPµØÖ·£º
-
-1. ¼ÙÉèÈÝÆ÷A·ÃÎÊÈÝÆ÷D:80£¨´´½¨ÈÝÆ÷DÊ±Ó³Éä¸Ã¶Ë¿Úµ½½Úµã£¬¼ÙÉèÓ³Éäµ½½ÚµãÉÏµÄÒ²ÊÇ80¶Ë¿Ú£©
-2. Êµ¼ÊÈÝÆ÷AÏò192.168.0.102:80·¢ËÍ±¨ÎÄ
-3. ÓÉÓÚ192.168.0.102ÓëÈÝÆ÷AÔÚ²»Í¬ÍøÂç£¬²éÕÒÂ·Â·ÓÉ£¬Æ¥Åäµ½Â·ÓÉÍ¨¹ý10.10.10.10¿É´ï
-4. ÈÝÆ÷AÏò10.10.10.10·¢ËÍARPÇëÇó
-5. docker0½»»»»ú°Ñ±¨ÎÄ×ª·¢¸ødocker0½Ó¿Ú£¬²¢ÉÏËÍÖÁÐ­ÒéÕ»£¬Ð­ÒéÕ»ÏìÓ¦ARPÇëÇó
-6. docker0½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-7. ÈÝÆ÷AÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö£¬docker0½»»»»ú×ª·¢±¨ÎÄµ½docker0½Ó¿Ú£¬²¢ÉÏËÍÖÁÐ­ÒéÕ»
-8. Host1ÄÚºËÅÐ¶Ï±¨ÎÄÐèÒª×ª·¢£¬²¢ÇÒÍ¨¹ýeth0¿ÉÒÔÖ±½Óµ½´ï
-9. Host1ÄÚºËIP²ã·¢ËÍ±¨ÎÄÊ±£¬»á¾­¹ýÔÚPOSTROUTING hookµã£¬±¨ÎÄµÄÔ´IPµØÖ·»á±»×ª»¯Îª192.168.0.101
-10. ±¨ÎÄ·¢ËÍµ½Host2½Úµã
-11. Host2ÊÕµ½±¨ÎÄ£¬²¢ÉÏËÍip²ã´¦Àí£¬»á¾­¹ýPREROUTING hookµã£¬Ä¿µÄIP»á±»ÐÞ¸ÄÎªÈÝÆ÷DµÄIPµØÖ·£¬Ä¿µÄ¶Ë¿Ú»á±»ÐÞ¸ÄÎªÈÝÆ÷µÄ¶Ë¿Ú
-12. Host2ÄÚºËÅÐ¶Ï¸Ã±¨ÎÄÐèÒª×ª·¢£¬²éÕÒµ½Â·ÓÉ±í£¬Í¨¹ýdocker0½Ó¿Ú¿ÉÒÔÖ±´ï
-13. Host2ÄÚºË·¢ËÍARPÇëÇóµ½docker0½Ó¿Ú£¨ÌáÇ°ÅäÖÃARP±íÏî¿É±ÜÃâ´Ë´ÎARPÇëÇó£©
-14. docker0½»»»»úflood ARPÇëÇó
-15. ÈÝÆ÷DÊÕµ½ARPÇëÇó²¢ÏìÓ¦
-16. docker0½»»»»ú×ª·¢ARPµ½docker0½Ó¿Ú£¬²¢ÉÏËÍÖÁÐ­ÒéÕ»
-17. Ð­ÒéÕ»¸üÐÂ±¨ÎÄµÄ¶þ²ãÍ·£¬²¢·¢ËÍµ½docker0½Ó¿Ú£¬docker0½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
-18. ÈÝÆ÷DÊÕµ½±¨ÎÄ£¬²¢ÏìÓ¦£¨ÏìÓ¦±¨ÎÄµÄÄ¿µÄIPÎª192.168.0.101£©
-19. docker0×ª·¢±¨ÎÄµ½docker0½Ó¿Ú£¬²¢ÉÏËÍÖÁÐ­ÒéÕ»
-20. Host2Ð­ÒéÕ»»áÔÚPOSTROUTING hookµã£¬°ÑÔ´IPºÍÔ´¶Ë¿ÚÐÞ¸ÄÎª½ÚµãIPºÍ½Úµã¶Ë¿Ú£¨TCÊµÏÖ£©
-21. Host1ÊÕµ½±¨ÎÄ£¬Host1ÄÚºËIP²ã·¢ËÍ±¨ÎÄÊ±£¬»á¾­¹ýÔÚPREROUTING hookµã£¬²¢°ÑÄ¿µÄIPÐÞ¸ÄÎªÈÝÆ÷AµÄIPµØÖ·£¬¶Ë¿ÚÐÞ¸ÄÎªÈÝÆ÷AµÄ¶Ë¿Ú
-22. Host1²éÑ¯±¾µØÂ·ÓÉ£¬ÕÒµ½Í¨¹ýdocker0Ö±½Ó¿ÉÒÔµ½´ï
-23. Host1ÐÞ¸Ä¶þ²ã±¨ÎÄÍ·£¬²¢·¢ËÍ±¨ÎÄµ½docker0½Ó¿Ú
-24. docker0½»»»»ú×ª·¢±¨ÎÄµ½ÈÝÆ÷A
-25. ÈÝÆ÷A½ÓÊÕµ½ÏìÓ¦±¨ÎÄ
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œdocker0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¼šå“åº”ARPè¯·æ±‚
+   2. docker0æŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œæ— å“åº”
+3. docker0äº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. docker0äº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-### Docker NAT·½°¸×Ü½á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-* ²»ÒÀÀµetcdµÈ·Ö²¼Ê½×é¼þ
-* ÒÀÀµiptables¿ò¼Ü£¬¶ÔÐÔÄÜÓ°Ïì±È½Ï´ó
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼ŒDocker NATæ¨¡å¼ä¸æ”¯æŒå®¹å™¨ä¹‹é—´ä¹‹é—´é€šä¿¡ï¼Œéœ€è¦é€šè¿‡æŠŠåœ°å€è½¬åŒ–ä¸ºèŠ‚ç‚¹IPåœ°å€ï¼š
+
+1. å‡è®¾å®¹å™¨Aè®¿é—®å®¹å™¨D:80ï¼ˆåˆ›å»ºå®¹å™¨Dæ—¶æ˜ å°„è¯¥ç«¯å£åˆ°èŠ‚ç‚¹ï¼Œå‡è®¾æ˜ å°„åˆ°èŠ‚ç‚¹ä¸Šçš„ä¹Ÿæ˜¯80ç«¯å£ï¼‰
+2. å®žé™…å®¹å™¨Aå‘192.168.0.102:80å‘é€æŠ¥æ–‡
+3. ç”±äºŽ192.168.0.102ä¸Žå®¹å™¨Aåœ¨ä¸åŒç½‘ç»œï¼ŒæŸ¥æ‰¾è·¯è·¯ç”±ï¼ŒåŒ¹é…åˆ°è·¯ç”±é€šè¿‡10.10.10.10å¯è¾¾
+4. å®¹å™¨Aå‘10.10.10.10å‘é€ARPè¯·æ±‚
+5. docker0äº¤æ¢æœºæŠŠæŠ¥æ–‡è½¬å‘ç»™docker0æŽ¥å£ï¼Œå¹¶ä¸Šé€è‡³åè®®æ ˆï¼Œåè®®æ ˆå“åº”ARPè¯·æ±‚
+6. docker0äº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+7. å®¹å™¨Aæ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡ºï¼Œdocker0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡åˆ°docker0æŽ¥å£ï¼Œå¹¶ä¸Šé€è‡³åè®®æ ˆ
+8. Host1å†…æ ¸åˆ¤æ–­æŠ¥æ–‡éœ€è¦è½¬å‘ï¼Œå¹¶ä¸”é€šè¿‡eth0å¯ä»¥ç›´æŽ¥åˆ°è¾¾
+9. Host1å†…æ ¸IPå±‚å‘é€æŠ¥æ–‡æ—¶ï¼Œä¼šç»è¿‡åœ¨POSTROUTING hookç‚¹ï¼ŒæŠ¥æ–‡çš„æºIPåœ°å€ä¼šè¢«è½¬åŒ–ä¸º192.168.0.101
+10. æŠ¥æ–‡å‘é€åˆ°Host2èŠ‚ç‚¹
+11. Host2æ”¶åˆ°æŠ¥æ–‡ï¼Œå¹¶ä¸Šé€ipå±‚å¤„ç†ï¼Œä¼šç»è¿‡PREROUTING hookç‚¹ï¼Œç›®çš„IPä¼šè¢«ä¿®æ”¹ä¸ºå®¹å™¨Dçš„IPåœ°å€ï¼Œç›®çš„ç«¯å£ä¼šè¢«ä¿®æ”¹ä¸ºå®¹å™¨çš„ç«¯å£
+12. Host2å†…æ ¸åˆ¤æ–­è¯¥æŠ¥æ–‡éœ€è¦è½¬å‘ï¼ŒæŸ¥æ‰¾åˆ°è·¯ç”±è¡¨ï¼Œé€šè¿‡docker0æŽ¥å£å¯ä»¥ç›´è¾¾
+13. Host2å†…æ ¸å‘é€ARPè¯·æ±‚åˆ°docker0æŽ¥å£ï¼ˆæå‰é…ç½®ARPè¡¨é¡¹å¯é¿å…æ­¤æ¬¡ARPè¯·æ±‚ï¼‰
+14. docker0äº¤æ¢æœºflood ARPè¯·æ±‚
+15. å®¹å™¨Dæ”¶åˆ°ARPè¯·æ±‚å¹¶å“åº”
+16. docker0äº¤æ¢æœºè½¬å‘ARPåˆ°docker0æŽ¥å£ï¼Œå¹¶ä¸Šé€è‡³åè®®æ ˆ
+17. åè®®æ ˆæ›´æ–°æŠ¥æ–‡çš„äºŒå±‚å¤´ï¼Œå¹¶å‘é€åˆ°docker0æŽ¥å£ï¼Œdocker0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+18. å®¹å™¨Dæ”¶åˆ°æŠ¥æ–‡ï¼Œå¹¶å“åº”ï¼ˆå“åº”æŠ¥æ–‡çš„ç›®çš„IPä¸º192.168.0.101ï¼‰
+19. docker0è½¬å‘æŠ¥æ–‡åˆ°docker0æŽ¥å£ï¼Œå¹¶ä¸Šé€è‡³åè®®æ ˆ
+20. Host2åè®®æ ˆä¼šåœ¨POSTROUTING hookç‚¹ï¼ŒæŠŠæºIPå’Œæºç«¯å£ä¿®æ”¹ä¸ºèŠ‚ç‚¹IPå’ŒèŠ‚ç‚¹ç«¯å£ï¼ˆTCå®žçŽ°ï¼‰
+21. Host1æ”¶åˆ°æŠ¥æ–‡ï¼ŒHost1å†…æ ¸IPå±‚å‘é€æŠ¥æ–‡æ—¶ï¼Œä¼šç»è¿‡åœ¨PREROUTING hookç‚¹ï¼Œå¹¶æŠŠç›®çš„IPä¿®æ”¹ä¸ºå®¹å™¨Açš„IPåœ°å€ï¼Œç«¯å£ä¿®æ”¹ä¸ºå®¹å™¨Açš„ç«¯å£
+22. Host1æŸ¥è¯¢æœ¬åœ°è·¯ç”±ï¼Œæ‰¾åˆ°é€šè¿‡docker0ç›´æŽ¥å¯ä»¥åˆ°è¾¾
+23. Host1ä¿®æ”¹äºŒå±‚æŠ¥æ–‡å¤´ï¼Œå¹¶å‘é€æŠ¥æ–‡åˆ°docker0æŽ¥å£
+24. docker0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨A
+25. å®¹å™¨AæŽ¥æ”¶åˆ°å“åº”æŠ¥æ–‡
 
 
-## Docker Overlay·½°¸
+### Docker NATæ–¹æ¡ˆæ€»ç»“
 
-Docker OverlayÊý¾ÝÃæÈçÏÂ£º
+* ä¸ä¾èµ–etcdç­‰åˆ†å¸ƒå¼ç»„ä»¶
+* ä¾èµ–iptablesæ¡†æž¶ï¼Œå¯¹æ€§èƒ½å½±å“æ¯”è¾ƒå¤§
+
+
+## Docker Overlayæ–¹æ¡ˆ
+
+Docker Overlayæ•°æ®é¢å¦‚ä¸‹ï¼š
 
 ![docker-overlay](images/docker-overlay.png "docker-overlay")
 
 
-### Í¬½ÚµãÈÝÆ÷Í¨ÐÅ
+### åŒèŠ‚ç‚¹å®¹å™¨é€šä¿¡
 
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷B£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨Í¬Flannel UDP£©£º
+å®¹å™¨Aè®¿é—®å®¹å™¨Bï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆåŒFlannel UDPï¼‰ï¼š
 
-1. ÈÝÆ÷AºÍÈÝÆ÷BÔÚÏàÍ¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷B·¢ËÍARPÇëÇó£¬br0½»»»»úflood¸ÃARPÇëÇó
-   1. ÈÝÆ÷BÊÕµ½ARPÇëÇóºó£¬»áÏìÓ¦ARPÇëÇó
-   2. ÆäËû½Ó¿ÚÊÕµ½ARPÇëÇóºó£¬²»»áÓÐARPÏìÓ¦
-3. br0½»»»»ú×ª·¢ARPÏìÓ¦¸øÈÝÆ÷A
-4. ÈÝÆ÷A½ÓÊÕµ½ARPÏìÓ¦£¬·â×°¶þ²ã±¨ÎÄ²¢·¢³ö
-5. weave½»»»»úÖ±½Ó×ª·¢±¨ÎÄµ½ÈÝÆ÷B
-6. ÈÝÆ÷B½ÓÊÕµ½±¨ÎÄ
-
-
-### ¿ç½ÚµãÈÝÆ÷Í¨ÐÅ
-
-ÈÝÆ÷A·ÃÎÊÈÝÆ÷D£¬Êý¾ÝÃæÁ÷³ÌÈçÏÂ£¨ÀàËÆFlannel VXLAN¾É°æ£©£º
-
-1. ÈÝÆ÷AºÍÈÝÆ÷DÔÚÏàÍ¬Í¬ÍøÂç£¬Ö±½Ó·¢ËÍ
-2. ÈÝÆ÷AÏòÈÝÆ÷D·¢ËÍARPÇëÇó
-3. br0¹ã²¥¸ÃARPÇëÇó
-4. vtep0ÊÕµ½ARPÇëÇó
-5. vtep0Éè±¸·â×°Íâ²ãvxlan¡¢UDP¡¢IPºÍMACÍ·£¬ÓÐÁ½ÖÖ·½°¸
-   1. vtep0ÅäÖÃarp proxy£¬²éÕÒÄÚºËARP±íÏî£¬²¢ÏìÓ¦Ó¦´ð
-   2. vtep0·¢ËÍARPÇëÇóµ½ËùÓÐµÄ¶Ô¶Ëvtep0£¨¼ÙÉèÊÇ´ËÖÖ£©
-6. Host2 ½ÓÊÕµ½ARPÇëÇó±¨ÎÄ£¬Í¨¹ýUDP Socket£¬²¢½øÈëµ½VXLAN½â°ü´¦Àí£¬×îÖÕ×÷ÎªvxlanÉè±¸ÊÕ°ü´¦Àí£¬vxlanÉè±¸¹ÒÔØµ½br0½»»»»ú
-7. br0½»»»»úflood¸ÃARPÇëÇó
-8. ÈÝÆ÷D½ÓÊÕµ½ARPÇëÇó£¬²¢ÏìÓ¦£¬br0½»»»»ú×ª·¢ARPÏìÓ¦±¨ÎÄµ½vtep0Éè±¸
-9. ÓÉÓÚvtep0Éè±¸¿ªÆôÁËlearning£¬´ËÊ±vtep0ÖªµÀ¶Ô¶Ëvtep0ÊÇÔÚ192.168.0.101
-10. vtep0·â×°vxlan±¨ÎÄ²¢·¢ËÍÖÁHost1
-11. Host1½ÓÊÕµ½ARPÏìÓ¦±¨ÎÄ£¬Í¨¹ýUDP Socket£¬²¢½øÈëµ½VXLAN½â°ü´¦Àí£¬×îÖÕ×÷ÎªvxlanÉè±¸ÊÕ°ü´¦Àí£¬vxlanÉè±¸¹ÒÔØµ½br0½»»»»ú
-12. br0½»»»»ú×ª·¢ARPÏìÓ¦±¨ÎÄ¸øÈÝÆ÷A
-13. ÈÝÆ÷A·â×°¶þ²ã±¨ÎÄÍ·£¬²¢·¢ËÍ
-14. br0½»»»»ú×ª·¢±¨ÎÄµ½vtep0Éè±¸
-15. vtep0Éè±¸¿ªÆôÁËlearning£¬´ËÊ±vtep0ÖªµÀ¶Ô¶Ëvtep0ÊÇÔÚ192.168.0.102
-16. vtep0·â×°vxlan±¨ÎÄ²¢·¢ËÍÖÁHost2
-17. Host2½ÓÊÕµ½±¨ÎÄ£¬Í¨¹ýUDP Socket£¬²¢½øÈëµ½VXLAN½â°ü´¦Àí£¬½øÈëbr0½»»»»ú
-18. br0½»»»»ú×ª·¢±¨ÎÄ¸øÈÝÆ÷D
-19. ÈÝÆ÷D½ÓÊÕµ½±¨ÎÄ
-
-### Docker Overlay·½°¸×Ü½á
-* ²»ÒÀÀµetcdµÈ·Ö²¼Ê½×é¼þ
-* ²»ÒÀÀµÍ¬²½×é¼þ£¬²»ÐèÒªÔ¤ÉèÐÅÏ¢
-* ²ÉÓÃvxlanÑ§Ï°µÄ·½Ê½£¬Ê×°üÑÓÊ±»á½Ï´ó
+1. å®¹å™¨Aå’Œå®¹å™¨Båœ¨ç›¸åŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Bå‘é€ARPè¯·æ±‚ï¼Œbr0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+   1. å®¹å™¨Bæ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¼šå“åº”ARPè¯·æ±‚
+   2. å…¶ä»–æŽ¥å£æ”¶åˆ°ARPè¯·æ±‚åŽï¼Œä¸ä¼šæœ‰ARPå“åº”
+3. br0äº¤æ¢æœºè½¬å‘ARPå“åº”ç»™å®¹å™¨A
+4. å®¹å™¨AæŽ¥æ”¶åˆ°ARPå“åº”ï¼Œå°è£…äºŒå±‚æŠ¥æ–‡å¹¶å‘å‡º
+5. weaveäº¤æ¢æœºç›´æŽ¥è½¬å‘æŠ¥æ–‡åˆ°å®¹å™¨B
+6. å®¹å™¨BæŽ¥æ”¶åˆ°æŠ¥æ–‡
 
 
-## Ïà¹ØÔÄ¶Á
+### è·¨èŠ‚ç‚¹å®¹å™¨é€šä¿¡
+
+å®¹å™¨Aè®¿é—®å®¹å™¨Dï¼Œæ•°æ®é¢æµç¨‹å¦‚ä¸‹ï¼ˆç±»ä¼¼Flannel VXLANæ—§ç‰ˆï¼‰ï¼š
+
+1. å®¹å™¨Aå’Œå®¹å™¨Dåœ¨ç›¸åŒåŒç½‘ç»œï¼Œç›´æŽ¥å‘é€
+2. å®¹å™¨Aå‘å®¹å™¨Då‘é€ARPè¯·æ±‚
+3. br0å¹¿æ’­è¯¥ARPè¯·æ±‚
+4. vtep0æ”¶åˆ°ARPè¯·æ±‚
+5. vtep0è®¾å¤‡å°è£…å¤–å±‚vxlanã€UDPã€IPå’ŒMACå¤´ï¼Œæœ‰ä¸¤ç§æ–¹æ¡ˆ
+   1. vtep0é…ç½®arp proxyï¼ŒæŸ¥æ‰¾å†…æ ¸ARPè¡¨é¡¹ï¼Œå¹¶å“åº”åº”ç­”
+   2. vtep0å‘é€ARPè¯·æ±‚åˆ°æ‰€æœ‰çš„å¯¹ç«¯vtep0ï¼ˆå‡è®¾æ˜¯æ­¤ç§ï¼‰
+6. Host2 æŽ¥æ”¶åˆ°ARPè¯·æ±‚æŠ¥æ–‡ï¼Œé€šè¿‡UDP Socketï¼Œå¹¶è¿›å…¥åˆ°VXLANè§£åŒ…å¤„ç†ï¼Œæœ€ç»ˆä½œä¸ºvxlanè®¾å¤‡æ”¶åŒ…å¤„ç†ï¼Œvxlanè®¾å¤‡æŒ‚è½½åˆ°br0äº¤æ¢æœº
+7. br0äº¤æ¢æœºfloodè¯¥ARPè¯·æ±‚
+8. å®¹å™¨DæŽ¥æ”¶åˆ°ARPè¯·æ±‚ï¼Œå¹¶å“åº”ï¼Œbr0äº¤æ¢æœºè½¬å‘ARPå“åº”æŠ¥æ–‡åˆ°vtep0è®¾å¤‡
+9. ç”±äºŽvtep0è®¾å¤‡å¼€å¯äº†learningï¼Œæ­¤æ—¶vtep0çŸ¥é“å¯¹ç«¯vtep0æ˜¯åœ¨192.168.0.101
+10. vtep0å°è£…vxlanæŠ¥æ–‡å¹¶å‘é€è‡³Host1
+11. Host1æŽ¥æ”¶åˆ°ARPå“åº”æŠ¥æ–‡ï¼Œé€šè¿‡UDP Socketï¼Œå¹¶è¿›å…¥åˆ°VXLANè§£åŒ…å¤„ç†ï¼Œæœ€ç»ˆä½œä¸ºvxlanè®¾å¤‡æ”¶åŒ…å¤„ç†ï¼Œvxlanè®¾å¤‡æŒ‚è½½åˆ°br0äº¤æ¢æœº
+12. br0äº¤æ¢æœºè½¬å‘ARPå“åº”æŠ¥æ–‡ç»™å®¹å™¨A
+13. å®¹å™¨Aå°è£…äºŒå±‚æŠ¥æ–‡å¤´ï¼Œå¹¶å‘é€
+14. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡åˆ°vtep0è®¾å¤‡
+15. vtep0è®¾å¤‡å¼€å¯äº†learningï¼Œæ­¤æ—¶vtep0çŸ¥é“å¯¹ç«¯vtep0æ˜¯åœ¨192.168.0.102
+16. vtep0å°è£…vxlanæŠ¥æ–‡å¹¶å‘é€è‡³Host2
+17. Host2æŽ¥æ”¶åˆ°æŠ¥æ–‡ï¼Œé€šè¿‡UDP Socketï¼Œå¹¶è¿›å…¥åˆ°VXLANè§£åŒ…å¤„ç†ï¼Œè¿›å…¥br0äº¤æ¢æœº
+18. br0äº¤æ¢æœºè½¬å‘æŠ¥æ–‡ç»™å®¹å™¨D
+19. å®¹å™¨DæŽ¥æ”¶åˆ°æŠ¥æ–‡
+
+### Docker Overlayæ–¹æ¡ˆæ€»ç»“
+* ä¸ä¾èµ–etcdç­‰åˆ†å¸ƒå¼ç»„ä»¶
+* ä¸ä¾èµ–åŒæ­¥ç»„ä»¶ï¼Œä¸éœ€è¦é¢„è®¾ä¿¡æ¯
+* é‡‡ç”¨vxlanå­¦ä¹ çš„æ–¹å¼ï¼Œé¦–åŒ…å»¶æ—¶ä¼šè¾ƒå¤§
+
+
+## ç›¸å…³é˜…è¯»
 
 
 

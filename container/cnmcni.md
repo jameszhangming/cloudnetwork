@@ -1,12 +1,12 @@
 # CNM & CNI 
 
-CNMºÍCNI²¢²»ÊÇÍøÂçÊµÏÖ£¬ËûÃÇÊÇÍøÂç¹æ·¶ºÍÍøÂçÌåÏµ£¬´ÓÑÐ·¢µÄ½Ç¶ÈËûÃÇ¾ÍÊÇÒ»¶Ñ½Ó¿Ú£¬Äãµ×²ãÊÇÓÃFlannelÒ²ºÃ¡¢ÓÃCalicoÒ²ºÃ£¬ËûÃÇ²¢²»¹ØÐÄ£¬CNMºÍCNI¹ØÐÄµÄÊÇÍøÂç¹ÜÀíµÄÎÊÌâ¡£
+CNMå’ŒCNIå¹¶ä¸æ˜¯ç½‘ç»œå®žçŽ°ï¼Œä»–ä»¬æ˜¯ç½‘ç»œè§„èŒƒå’Œç½‘ç»œä½“ç³»ï¼Œä»Žç ”å‘çš„è§’åº¦ä»–ä»¬å°±æ˜¯ä¸€å †æŽ¥å£ï¼Œä½ åº•å±‚æ˜¯ç”¨Flannelä¹Ÿå¥½ã€ç”¨Calicoä¹Ÿå¥½ï¼Œä»–ä»¬å¹¶ä¸å…³å¿ƒï¼ŒCNMå’ŒCNIå…³å¿ƒçš„æ˜¯ç½‘ç»œç®¡ç†çš„é—®é¢˜ã€‚
 
-ÈÝÆ÷ÍøÂç·¢Õ¹µ½ÏÖÔÚ£¬ÐÎ³ÉÁËÁ½´óÕóÓª£¬¾ÍÊÇDockerµÄCNMºÍGoogle¡¢CoreOS¡¢KuberenetesÖ÷µ¼µÄCNI¡£
+å®¹å™¨ç½‘ç»œå‘å±•åˆ°çŽ°åœ¨ï¼Œå½¢æˆäº†ä¸¤å¤§é˜µè¥ï¼Œå°±æ˜¯Dockerçš„CNMå’ŒGoogleã€CoreOSã€Kuberenetesä¸»å¯¼çš„CNIã€‚
 
-## CNM ÕóÓª
+## CNM é˜µè¥
 
-Docker LibnetworkµÄÓÅÊÆ¾ÍÊÇÔ­Éú£¬¶øÇÒºÍDockerÈÝÆ÷ÉúÃüÖÜÆÚ½áºÏ½ôÃÜ£»È±µãÒ²¿ÉÒÔÀí½âÎªÊÇÔ­Éú£¬±»Docker¡°°ó¼Ü¡±£º
+Docker Libnetworkçš„ä¼˜åŠ¿å°±æ˜¯åŽŸç”Ÿï¼Œè€Œä¸”å’ŒDockerå®¹å™¨ç”Ÿå‘½å‘¨æœŸç»“åˆç´§å¯†ï¼›ç¼ºç‚¹ä¹Ÿå¯ä»¥ç†è§£ä¸ºæ˜¯åŽŸç”Ÿï¼Œè¢«Dockerâ€œç»‘æž¶â€ï¼š
 
 * Docker Swarm overlay
 * Macvlan & IP networkdrivers
@@ -15,9 +15,9 @@ Docker LibnetworkµÄÓÅÊÆ¾ÍÊÇÔ­Éú£¬¶øÇÒºÍDockerÈÝÆ÷ÉúÃüÖÜÆÚ½áºÏ½ôÃÜ£»È±µãÒ²¿ÉÒÔÀí½
 * Weave
 * Kuryr 
 
-## CNI ÕóÓª
+## CNI é˜µè¥
 
-CNIµÄÓÅÊÆÊÇ¼æÈÝÆäËûÈÝÆ÷¼¼Êõ£¨e.g. rkt£©¼°ÉÏ²ã±àÅÅÏµÍ³£¨Kubernetes & Mesos)£¬¶øÇÒÉçÇø»îÔ¾ÊÆÍ·Ñ¸ÃÍ£¬Kubernetes¼ÓÉÏCoreOSÖ÷ÍÆ£»È±µãÊÇ·ÇDockerÔ­Éú£º
+CNIçš„ä¼˜åŠ¿æ˜¯å…¼å®¹å…¶ä»–å®¹å™¨æŠ€æœ¯ï¼ˆe.g. rktï¼‰åŠä¸Šå±‚ç¼–æŽ’ç³»ç»Ÿï¼ˆKubernetes & Mesos)ï¼Œè€Œä¸”ç¤¾åŒºæ´»è·ƒåŠ¿å¤´è¿…çŒ›ï¼ŒKubernetesåŠ ä¸ŠCoreOSä¸»æŽ¨ï¼›ç¼ºç‚¹æ˜¯éžDockeråŽŸç”Ÿï¼š
 
 * Kubernetes
 * Weave
