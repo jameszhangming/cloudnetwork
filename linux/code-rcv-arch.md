@@ -331,7 +331,8 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	/* When the interface is in promisc. mode, drop all the crap
 	 * that it receives, do not try to analyse it.
 	 */
-	if (skb->pkt_type == PACKET_OTHERHOST)   //网卡收包时会根据mac地址进行匹配，如果匹配该值为PACKET_HOST
+	//网卡收包时会根据mac地址进行匹配，如果匹配该值为PACKET_HOST，所以报文的DMAC地址必须为接收节点的MAC地址
+	if (skb->pkt_type == PACKET_OTHERHOST)   
 		goto drop;
 
 

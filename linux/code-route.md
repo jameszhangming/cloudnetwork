@@ -114,7 +114,7 @@ int ip_route_input_noref(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 		struct in_device *in_dev = __in_dev_get_rcu(dev);
 
 		if (in_dev) {
-			int our = ip_check_mc_rcu(in_dev, daddr, saddr,
+			int our = ip_check_mc_rcu(in_dev, daddr, saddr,  //检查目的mac地址是否在in_dev的ip_mc_list中
 						  ip_hdr(skb)->protocol);
 			if (our
 #ifdef CONFIG_IP_MROUTE
