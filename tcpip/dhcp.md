@@ -5,6 +5,8 @@ DHCP（Dynamic Host Configuration Protocol）动态主机配置协议，是IETF�
 
 ## DHCP报文格式
 
+DHCP协议采用UDP作为传输协议：
+
 ![DHCP报文格式](images/dhcp-package.jpg "DHCP报文格式")
 
 ### DHCP报文头
