@@ -1,55 +1,89 @@
-# OVSÊý¾ÝÃæÁ÷±í²éÕÒ
+# OVSæ•°æ®é¢æµè¡¨æŸ¥æ‰¾
 
-OVSÊý¾ÝÃæÁ÷±í²éÕÒÊÇÍøÂçÐÔÄÜµÄ¹Ø¼ü£¬ºËÐÄÄ¿±êÊÇ¸ù¾ÝSKB±¨ÎÄ¿ìËÙÆ¥Åäµ½Á÷±í£¬OVSÁ÷±íµÄÉè¼Æµã°üÀ¨£º
+OVSæ•°æ®é¢æµè¡¨æŸ¥æ‰¾æ˜¯ç½‘ç»œæ€§èƒ½çš„å…³é”®ï¼Œæ ¸å¿ƒç›®æ ‡æ˜¯æ ¹æ®SKBæŠ¥æ–‡å¿«é€ŸåŒ¹é…åˆ°æµè¡¨ï¼ŒOVSæµè¡¨çš„è®¾è®¡ç‚¹åŒ…æ‹¬ï¼š
 
-* Á÷±íÊýÁ¿²»ÄÜÌ«¶à
-  * ÐèÒªÌá¹©Á÷±íÀÏ»¯µÄ»úÖÆ
-  * Á÷±íÀÏ»¯ºó£¬Î´Æ¥Åäµ½Á÷±í²ÉÓÃupcallµ½ÓÃ»§Ì¬À´ÏÂ·¢Á÷±í
-* ³ä·ÖÀûÓÃÓ²¼þÄÜÁ¦
-  * Ê¹ÓÃskb->hashÖµÀ´½øÐÐ¿ìËÙÁ÷±íÆ¥Åä
-* ±¨ÎÄÊ±¼äÉÏµÄÁ¬ÐøÐÔ
-  * µÚÒ»´ÎÂýÆ¥Åä£¬ºóÐø¿ìËÙÆ¥Åä
-* Á÷±íÆ¥ÅäÓÅ»¯
-  * Í¨¹ýÁ¬ÐøµÄÄÚ´æÆ¥Åä´úÌæÖð¸ö×Ö¶ÎµÄÆ¥Åä
+* æµè¡¨æ•°é‡ä¸èƒ½å¤ªå¤š
+  * éœ€è¦æä¾›æµè¡¨è€åŒ–çš„æœºåˆ¶
+  * æµè¡¨è€åŒ–åŽï¼ŒæœªåŒ¹é…åˆ°æµè¡¨é‡‡ç”¨upcallåˆ°ç”¨æˆ·æ€æ¥ä¸‹å‘æµè¡¨
+* å……åˆ†åˆ©ç”¨ç¡¬ä»¶èƒ½åŠ›
+  * ä½¿ç”¨skb->hashå€¼æ¥è¿›è¡Œå¿«é€Ÿæµè¡¨åŒ¹é…
+* æŠ¥æ–‡æ—¶é—´ä¸Šçš„è¿žç»­æ€§
+  * ç¬¬ä¸€æ¬¡æ…¢åŒ¹é…ï¼ŒåŽç»­å¿«é€ŸåŒ¹é…
+* æµè¡¨åŒ¹é…ä¼˜åŒ–
+  * é€šè¿‡è¿žç»­çš„å†…å­˜åŒ¹é…ä»£æ›¿é€ä¸ªå­—æ®µçš„åŒ¹é…
 
-## Ö÷ÒªÊý¾Ý½á¹¹
+# ä¸»è¦æ•°æ®ç»“æž„
 
 ![flow-object](images/flow-object.png "flow-object")
 
-Ö÷ÒªÊý¾ÝÀàÐÍËµÃ÷£º
+ä¸»è¦æ•°æ®ç±»åž‹è¯´æ˜Žï¼š
 
 * mask_cache_entry
-  * per_cpuÊôÐÔ£¬Ö§³ÖÍ¨¹ýskb->hash¿ìËÙ²éÕÒmask
+  * per_cpuå±žæ€§ï¼Œæ”¯æŒé€šè¿‡skb->hashå¿«é€ŸæŸ¥æ‰¾mask
 * table_instance
-  * ´æ·ÅÁ÷±íÊý¾Ý
+  * å­˜æ”¾æµè¡¨æ•°æ®
 * mask_array
-  * ´æ·Åmask¶ÔÏó£¬Í¨¹ýmaskºÍkey²éÕÒflow
+  * å­˜æ”¾maskå¯¹è±¡ï¼Œé€šè¿‡maskå’ŒkeyæŸ¥æ‰¾flow
+
+  
+# æµè¡¨æŸ¥æ‰¾ä»£ç æµç¨‹
+
+```
+int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
+		      const struct ip_tunnel_info *tun_info)
+{
+	struct sw_flow_key key;
+	int error;
+
+	OVS_CB(skb)->input_vport = vport;
+	OVS_CB(skb)->mru = 0;
+	if (unlikely(dev_net(skb->dev) != ovs_dp_get_net(vport->dp))) {
+		u32 mark;
+
+		mark = skb->mark;
+		skb_scrub_packet(skb, true);
+		skb->mark = mark;
+		tun_info = NULL;
+	}
+
+	ovs_skb_init_inner_protocol(skb);
+	skb_clear_ovs_gso_cb(skb);
+	/* Extract flow from 'skb' into 'key'. */
+	error = ovs_flow_key_extract(tun_info, skb, &key);	 //æ ¹æ®æŠ¥æ–‡ç”Ÿæˆkey
+	if (unlikely(error)) {
+		kfree_skb(skb);
+		return error;
+	}
+	ovs_dp_process_packet(skb, &key);	//æŠ¥æ–‡å¤„ç†
+	return 0;
+}
+```
 
 
-## Á÷±í²éÕÒÁ÷³Ì
+# æµè¡¨æŸ¥æ‰¾æµç¨‹
 
 ![flow-progress](images/flow-progress.png "flow-progress")
 
-Á÷±í²éÕÒÁ÷³ÌÈçÏÂ£º
+æµè¡¨æŸ¥æ‰¾æµç¨‹å¦‚ä¸‹ï¼š
 
-1. ÕÒµ½mask_index
-  1. Èç¹ûskb->hashÓÐÖµ£¬Ö±½Ó¸ù¾Ý¸ÃÖµÕÒµ½ÏàÓ¦µÄentry£¬Èç¹ûÍ¨¹ý¸ÃentryÎ´²éµ½Á÷±í£¬Ôò´Ó0ºÅ¿ªÊ¼±éÀúmask_cache_entryÊý×é£¨Âý²éÑ¯£©
-  2. Èç¹ûskb->hashÎ´ÉèÖÃ£¬´Ó0ºÅ¿ªÊ¼±éÀúmask_cache_entryÊý×é£¨Âý²éÑ¯£©
-2. ¸ù¾ÝÇ°Ò»²½µÄentryµÄmask_index³ÉÔ±ÕÒµ½mask£¬Èç¹ûÍ¨¹ý¸ÃmaskÎ´ÕÒµ½flow£¬Ôò»á±éÀúÕû¸ömaskÊý×é£¨Âý²éÑ¯£©
-3. ¸ù¾ÝmaskºÍkeyµÃµ½masked_key£»
-4. ¸ù¾Ýmasked_keyºÍmask¼ÆËã³öhash£»
-5. ¸ù¾ÝhashÖµÕÒµ½bucket£¬¸ù¾ÝbucketÕÒµ½flowÁ´±í£»
-6. ±éÀúflowÁ´±í£¬ÕÒµ½Æ¥ÅäµÄflow£¨flow->maskµÈÓÚmask£¬flow->hashµÈÓÚhask£¬flowÄÚÈÝºÍmasked_keyÏàÍ¬£©
-7. Ë¢ÐÂmask_cache_entryÊý×éµÄmask_indexÖµ£¨ÏÂ´ÎÍ¬Àà±¨ÎÄ¿ÉÒÔ¿ìËÙÆ¥Åä£©
+1. æ‰¾åˆ°mask_index
+  1. å¦‚æžœskb->hashæœ‰å€¼ï¼Œç›´æŽ¥æ ¹æ®è¯¥å€¼æ‰¾åˆ°ç›¸åº”çš„entryï¼Œå¦‚æžœé€šè¿‡è¯¥entryæœªæŸ¥åˆ°æµè¡¨ï¼Œåˆ™ä»Ž0å·å¼€å§‹éåŽ†mask_cache_entryæ•°ç»„ï¼ˆæ…¢æŸ¥è¯¢ï¼‰
+  2. å¦‚æžœskb->hashæœªè®¾ç½®ï¼Œä»Ž0å·å¼€å§‹éåŽ†mask_cache_entryæ•°ç»„ï¼ˆæ…¢æŸ¥è¯¢ï¼‰
+2. æ ¹æ®å‰ä¸€æ­¥çš„entryçš„mask_indexæˆå‘˜æ‰¾åˆ°maskï¼Œå¦‚æžœé€šè¿‡è¯¥maskæœªæ‰¾åˆ°flowï¼Œåˆ™ä¼šéåŽ†æ•´ä¸ªmaskæ•°ç»„ï¼ˆæ…¢æŸ¥è¯¢ï¼‰
+3. æ ¹æ®maskå’Œkeyå¾—åˆ°masked_keyï¼›
+4. æ ¹æ®masked_keyå’Œmaskè®¡ç®—å‡ºhashï¼›
+5. æ ¹æ®hashå€¼æ‰¾åˆ°bucketï¼Œæ ¹æ®bucketæ‰¾åˆ°flowé“¾è¡¨ï¼›
+6. éåŽ†flowé“¾è¡¨ï¼Œæ‰¾åˆ°åŒ¹é…çš„flowï¼ˆflow->maskç­‰äºŽmaskï¼Œflow->hashç­‰äºŽhaskï¼Œflowå†…å®¹å’Œmasked_keyç›¸åŒï¼‰
+7. åˆ·æ–°mask_cache_entryæ•°ç»„çš„mask_indexå€¼ï¼ˆä¸‹æ¬¡åŒç±»æŠ¥æ–‡å¯ä»¥å¿«é€ŸåŒ¹é…ï¼‰
 
-### OVSÁ÷±í²éÕÒ×Ü½á
+## OVSæµè¡¨æŸ¥æ‰¾æ€»ç»“
 
-* maskÊýÁ¿ÒªÉÙ
-  * maskµÄÊýÁ¿¶ÔÁ÷±í²éÕÒµÄÐÔÄÜÓ°Ïì·Ç³£´ó£¬Òª¾¡Á¿¼õÉÙmaskµÄÊýÁ¿
-  * maskµÄÊýÁ¿ºÍÁ÷±íÖÐÊ¹ÓÃµÄ×Ö¶ÎÖÖÀàÏà¹Ø£¬Òª¼õÉÙ²»Í¬±¨ÎÄ×Ö¶ÎÆ¥ÅäµÄÊýÁ¿
-* ±¨ÎÄ½øÈëOVSÊ±È«Á¿µÄkey½âÎöÓÐµãÀË·Ñ
+* maskæ•°é‡è¦å°‘
+  * maskçš„æ•°é‡å¯¹æµè¡¨æŸ¥æ‰¾çš„æ€§èƒ½å½±å“éžå¸¸å¤§ï¼Œè¦å°½é‡å‡å°‘maskçš„æ•°é‡
+  * maskçš„æ•°é‡å’Œæµè¡¨ä¸­ä½¿ç”¨çš„å­—æ®µç§ç±»ç›¸å…³ï¼Œè¦å‡å°‘ä¸åŒæŠ¥æ–‡å­—æ®µåŒ¹é…çš„æ•°é‡
+* æŠ¥æ–‡è¿›å…¥OVSæ—¶å…¨é‡çš„keyè§£æžæœ‰ç‚¹æµªè´¹
 
 
-## ÄÚºËÁ÷±í¸üÐÂ
+# å†…æ ¸æµè¡¨æ›´æ–°
 
 ![flow-update](images/flow-update.png "flow-update")
