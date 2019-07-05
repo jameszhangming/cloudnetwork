@@ -1,15 +1,15 @@
-# OVSÊı¾İÃæ
+# OVSæ•°æ®é¢
 
-OVSÊı¾İÃæÈë¿Ú£º
+OVSæ•°æ®é¢å…¥å£ï¼š
 
 ![datapath](images/datapath.png "datapath")
 
 
-OVSÊı¾İÃæÖ÷ÒªÓĞÈçÏÂÈë¿Ú£º
+OVSæ•°æ®é¢ä¸»è¦æœ‰å¦‚ä¸‹å…¥å£ï¼š
 
-* VLXAN½Ó¿Ú
-  * Í¨¹ıUDP Socket×¢²áµÄvxlan_udp_encap_recvº¯Êı½øÈëOVS
-* ÎïÀíÍø¿¨
-  * Í¨¹ıÎïÀíÍø¿¨¹ÒÔØµ½OVSÍøÇÅÊ±£¬×¢²áµÄrx_handlerº¯Êınetdev_frame_hook
-* internal¶Ë¿Ú
-  * Í¨¹ıinternal¶Ë¿ÚµÄÇı¶¯·¢°üº¯Êı£¬¼´internal_dev_xmitº¯Êı
+* VLXANæ¥å£
+  * é€šè¿‡UDP Socketæ³¨å†Œçš„vxlan_udp_encap_recvå‡½æ•°è¿›å…¥OVS
+* ç‰©ç†ç½‘å¡
+  * é€šè¿‡ç‰©ç†ç½‘å¡æŒ‚è½½åˆ°OVSç½‘æ¡¥æ—¶ï¼Œæ³¨å†Œçš„rx_handlerå‡½æ•°netdev_frame_hook
+* internalç«¯å£
+  * é€šè¿‡internalç«¯å£çš„é©±åŠ¨å‘åŒ…å‡½æ•°ï¼Œå³internal_dev_xmitå‡½æ•°
