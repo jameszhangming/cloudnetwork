@@ -57,6 +57,170 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	ovs_dp_process_packet(skb, &key);	//报文处理
 	return 0;
 }
+
+void ovs_dp_process_packet(struct sk_buff *skb, struct sw_flow_key *key)
+{
+	const struct vport *p = OVS_CB(skb)->input_vport;
+	struct datapath *dp = p->dp;
+	struct sw_flow *flow;
+	struct sw_flow_actions *sf_acts;
+	struct dp_stats_percpu *stats;
+	u64 *stats_counter;
+	u32 n_mask_hit;
+
+	stats = this_cpu_ptr(dp->stats_percpu);
+
+	/* Look up flow. */
+	flow = ovs_flow_tbl_lookup_stats(&dp->table, key, skb_get_hash(skb),	//查询转发表
+					 &n_mask_hit);
+	if (unlikely(!flow)) {		//如果没有查到流表，则上送的upcall线程处理
+		struct dp_upcall_info upcall;
+		int error;
+
+		memset(&upcall, 0, sizeof(upcall));
+		upcall.cmd = OVS_PACKET_CMD_MISS;
+		upcall.portid = ovs_vport_find_upcall_portid(p, skb);
+		upcall.mru = OVS_CB(skb)->mru;
+		error = ovs_dp_upcall(dp, skb, key, &upcall);
+		if (unlikely(error))
+			kfree_skb(skb);
+		else
+			consume_skb(skb);
+		stats_counter = &stats->n_missed;	//丢包统计加一
+		goto out;
+	}
+
+	ovs_flow_stats_update(flow, key->tp.flags, skb);
+	sf_acts = rcu_dereference(flow->sf_acts);		//获取action
+	ovs_execute_actions(dp, skb, sf_acts, key);		//对报文执行action
+
+	stats_counter = &stats->n_hit;
+
+out:
+	/* Update datapath statistics. */
+	u64_stats_update_begin(&stats->syncp);
+	(*stats_counter)++;
+	stats->n_mask_hit += n_mask_hit;
+	u64_stats_update_end(&stats->syncp);
+}
+
+struct sw_flow *ovs_flow_tbl_lookup_stats(struct flow_table *tbl,
+					  const struct sw_flow_key *key,
+					  u32 skb_hash,
+					  u32 *n_mask_hit)
+{
+	struct mask_array *ma = rcu_dereference(tbl->mask_array);
+	struct table_instance *ti = rcu_dereference(tbl->ti);     //得到table实例
+	struct mask_cache_entry *entries, *ce;
+	struct sw_flow *flow;
+	u32 hash;
+	int seg;
+
+	*n_mask_hit = 0;
+	if (unlikely(!skb_hash)) {	//如果报文没有hash值，则mask_index为0，查表
+		u32 mask_index = 0;
+
+		return flow_lookup(tbl, ti, ma, key, n_mask_hit, &mask_index);
+	}
+
+	/* Pre and post recirulation flows usually have the same skb_hash
+	 * value. To avoid hash collisions, rehash the 'skb_hash' with
+	 * 'recirc_id'.  */
+	if (key->recirc_id)
+		skb_hash = jhash_1word(skb_hash, key->recirc_id);
+
+	ce = NULL;
+	hash = skb_hash;
+	entries = this_cpu_ptr(tbl->mask_cache);
+
+	/* Find the cache entry 'ce' to operate on. */
+	for (seg = 0; seg < MC_HASH_SEGS; seg++) {		//为什么采用这种策略？
+		int index = hash & (MC_HASH_ENTRIES - 1);
+		struct mask_cache_entry *e;
+
+		e = &entries[index];			//entry最大为256项
+		if (e->skb_hash == skb_hash) {        //如果在cache entry找到报文hash相同项，则根据该entry的mask查表
+			flow = flow_lookup(tbl, ti, ma, key, n_mask_hit,
+					   &e->mask_index);
+			if (!flow)
+				e->skb_hash = 0;
+			return flow;
+		}
+
+		if (!ce || e->skb_hash < ce->skb_hash)
+			ce = e;  /* A better replacement cache candidate. */
+
+		hash >>= MC_HASH_SHIFT;
+	}
+
+	/* Cache miss, do full lookup. */
+	flow = flow_lookup(tbl, ti, ma, key, n_mask_hit, &ce->mask_index);
+	if (flow)
+		ce->skb_hash = skb_hash;
+
+	return flow;
+}
+
+static struct sw_flow *flow_lookup(struct flow_table *tbl,
+				   struct table_instance *ti,
+				   const struct mask_array *ma,
+				   const struct sw_flow_key *key,
+				   u32 *n_mask_hit,
+				   u32 *index)
+{
+	struct sw_flow_mask *mask;
+	struct sw_flow *flow;
+	int i;
+
+	if (*index < ma->max) {    //如果index的值小于mask的entry数量，说明index是有效值，基于该值获取sw_flow_mask值
+		mask = rcu_dereference_ovsl(ma->masks[*index]);
+		if (mask) {
+			flow = masked_flow_lookup(ti, key, mask, n_mask_hit);
+			if (flow)
+				return flow;
+		}
+	}
+
+	for (i = 0; i < ma->max; i++)  {
+
+		if (i == *index)	//前面已查询过，所以跳过该值
+			continue;
+
+		mask = rcu_dereference_ovsl(ma->masks[i]);
+		if (!mask)
+			continue;
+
+		flow = masked_flow_lookup(ti, key, mask, n_mask_hit);
+		if (flow) { /* Found */
+			*index = i;		//更新index指向的值，下次可以直接命中
+			return flow;
+		}
+	}
+
+	return NULL;
+}
+
+static struct sw_flow *masked_flow_lookup(struct table_instance *ti,
+					  const struct sw_flow_key *unmasked,
+					  const struct sw_flow_mask *mask,
+					  u32 *n_mask_hit)
+{
+	struct sw_flow *flow;
+	struct hlist_head *head;
+	u32 hash;
+	struct sw_flow_key masked_key;
+
+	ovs_flow_mask_key(&masked_key, unmasked, false, mask);
+	hash = flow_hash(&masked_key, &mask->range);
+	head = find_bucket(ti, hash);
+	(*n_mask_hit)++;
+	hlist_for_each_entry_rcu(flow, head, flow_table.node[ti->node_ver]) {
+		if (flow->mask == mask && flow->flow_table.hash == hash &&
+		    flow_cmp_masked_key(flow, &masked_key, &mask->range))
+			return flow;
+	}
+	return NULL;
+}
 ```
 
 
