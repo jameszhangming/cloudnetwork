@@ -89,7 +89,7 @@ static struct vport_ops ovs_netdev_vport_ops = {
 	.type		= OVS_VPORT_TYPE_NETDEV,
 	.create		= netdev_create,
 	.destroy	= netdev_destroy,
-	.send		= dev_queue_xmit,
+	.send		= dev_queue_xmit,   //直接调用二层发包
 };
 ```
 
