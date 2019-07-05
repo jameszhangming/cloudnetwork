@@ -1,17 +1,19 @@
 # Netlink
 
-OVS π”√Netlink”√”⁄ƒ⁄∫ÀÃ¨∫Õ”√ªßÃ¨Õ®–≈°£
+OVS‰ΩøÁî®NetlinkÁî®‰∫éÂÜÖÊ†∏ÊÄÅÂíåÁî®Êà∑ÊÄÅÈÄö‰ø°„ÄÇ
 
-## ÷˜“™ ˝æ›Ω·ππ
+
+# ‰∏ªË¶ÅÊï∞ÊçÆÁªìÊûÑ
 
 ![netlink-object](images/netlink-object.png "netlink-object")
 
 
-## ofpbuf ˝æ›Ω·ππ
 
-OVS π”√ofpbuf”√”⁄netlinkÕ®–≈ ±◊‘∂®“Â ˝æ›°£
+# ofpbufÊï∞ÊçÆÁªìÊûÑ
 
-ofpbuf ˝æ›Ω·ππ∂®“Â£∫
+OVS‰ΩøÁî®ofpbufÁî®‰∫énetlinkÈÄö‰ø°Êó∂Ëá™ÂÆö‰πâÊï∞ÊçÆ„ÄÇ
+
+ofpbufÊï∞ÊçÆÁªìÊûÑÂÆö‰πâÔºö
 ```
 struct ofpbuf {
     void *base; /* First byte of allocated space. */
@@ -30,7 +32,7 @@ struct ofpbuf {
 
 ![ofpbuf](images/ofpbuf.png "ofpbuf")
 
-«Â≥˝ ˝æ›£∫
+Ê∏ÖÈô§Êï∞ÊçÆÔºö
 ```
 static inline void ofpbuf_clear(struct ofpbuf *b)
 {
@@ -39,7 +41,7 @@ static inline void ofpbuf_clear(struct ofpbuf *b)
 }
 ```
 
-Õ∑≤ø‘§¡Ùø’º‰:
+Â§¥ÈÉ®È¢ÑÁïôÁ©∫Èó¥:
 ```
 Void ofpbuf_reserve(struct ofpbuf *b, size_t size)
 {
@@ -49,7 +51,7 @@ Void ofpbuf_reserve(struct ofpbuf *b, size_t size)
 }
 ```
 
-–¬∑÷≈‰ø’º‰£¨∑µªÿ÷µŒ™–¬ø’º‰µƒ ◊µÿ÷∑£¨≥§∂»Œ™size£∫
+Êñ∞ÂàÜÈÖçÁ©∫Èó¥ÔºåËøîÂõûÂÄº‰∏∫Êñ∞Á©∫Èó¥ÁöÑÈ¶ñÂú∞ÂùÄÔºåÈïøÂ∫¶‰∏∫sizeÔºö
 ```
 void * ofpbuf_put_uninit(struct ofpbuf *b, size_t size)
 {
@@ -62,9 +64,9 @@ void * ofpbuf_put_uninit(struct ofpbuf *b, size_t size)
 ```
 
 
-## nlattr ˝æ›Ω·ππ
+# nlattrÊï∞ÊçÆÁªìÊûÑ
 
-nlattr ˝æ›Ω·ππ∂®“Â£∫
+nlattrÊï∞ÊçÆÁªìÊûÑÂÆö‰πâÔºö
 ```
 struct nlattr {
     uint16_t nla_len;
@@ -72,7 +74,7 @@ struct nlattr {
 };
 ```
 
-∏∫‘ÿ ˝æ›≥§∂»:
+Ë¥üËΩΩÊï∞ÊçÆÈïøÂ∫¶:
 ```
 static inline int nla_len(const struct nlattr *nla)
 {
@@ -80,7 +82,7 @@ static inline int nla_len(const struct nlattr *nla)
 }
 ```
 
-ªÒ»°÷∏’Î ˝æ›£¨¿˝»Á◊÷∑˚¥Æ:
+Ëé∑ÂèñÊåáÈíàÊï∞ÊçÆÔºå‰æãÂ¶ÇÂ≠óÁ¨¶‰∏≤:
 ```
 static inline void *nla_data(const struct nlattr *nla)
 {
@@ -88,7 +90,7 @@ static inline void *nla_data(const struct nlattr *nla)
 }
 ```
 
-ªÒ»°Œﬁ∑˚∫≈32Œªint÷µ:
+Ëé∑ÂèñÊó†Á¨¶Âè∑32‰ΩçintÂÄº:
 ```
 static inline u32 nla_get_u32(const struct nlattr *nla)
 {
@@ -96,7 +98,7 @@ static inline u32 nla_get_u32(const struct nlattr *nla)
 }
 ```
 
-ªÒ»°Œﬁ∑˚∫≈16Œª÷µ:
+Ëé∑ÂèñÊó†Á¨¶Âè∑16‰ΩçÂÄº:
 ```
 static inline u16 nla_get_u16(const struct nlattr *nla)
 {
@@ -105,21 +107,21 @@ static inline u16 nla_get_u16(const struct nlattr *nla)
 ```
 
 
-## ÷˜“™¡˜≥Ã
+# ‰∏ªË¶ÅÊµÅÁ®ã
 
 ![netlink-progress](images/netlink-progress.png "netlink-progress")
 
 
-## ”√ªßÃ¨¥¥Ω®Netlink Socket
+## Áî®Êà∑ÊÄÅÂàõÂª∫Netlink Socket
 ```
 int nl_sock_create(int protocol, struct nl_sock **sockp)
 {
 
     *sockp = NULL;
-	//…Í«Înl_sock∂‘œÛø’º‰
+	//Áî≥ËØ∑nl_sockÂØπË±°Á©∫Èó¥
     sock = xmalloc(sizeof *sock);      
 	
-	//¥¥Ω®socket£¨’‚¿ÔprotocolŒ™NETLINK_GENERIC
+	//ÂàõÂª∫socketÔºåËøôÈáåprotocol‰∏∫NETLINK_GENERIC
     sock->fd = socket(AF_NETLINK, SOCK_RAW, protocol);	    
     if (sock->fd < 0) {
         VLOG_ERR("fcntl: %s", ovs_strerror(errno));
@@ -129,12 +131,12 @@ int nl_sock_create(int protocol, struct nl_sock **sockp)
     if (setsockopt(sock->fd, SOL_SOCKET, SO_RCVBUFFORCE,
                    &rcvbuf, sizeof rcvbuf)) {
     }
-    °≠°≠
+    ‚Ä¶‚Ä¶
     /* Connect to kernel (pid 0) as remote address. */
     memset(&remote, 0, sizeof remote);
     remote.nl_family = AF_NETLINK;
     remote.nl_pid = 0;
-	//”Îkernel genlink∞Û∂®£¨ƒ⁄∫À÷–◊¢≤·¡Àgen_familyµƒ∑Ω∑®ø…“‘±ªµ˜”√
+	//‰∏ékernel genlinkÁªëÂÆöÔºåÂÜÖÊ†∏‰∏≠Ê≥®ÂÜå‰∫Ügen_familyÁöÑÊñπÊ≥ïÂèØ‰ª•Ë¢´Ë∞ÉÁî®
     if (connect(sock->fd, (struct sockaddr *) &remote, sizeof remote) < 0) {	
         goto error;
     }
@@ -144,9 +146,9 @@ int nl_sock_create(int protocol, struct nl_sock **sockp)
     if (getsockname(sock->fd, (struct sockaddr *) &local, &local_size) < 0) {
         goto error;
     }
-	//µ√µΩportid£¨’‚∏ˆ–Ë“™∑¢ÀÕƒ⁄ƒ⁄∫À£¨ƒ⁄∫À“¿¿µ’‚∏ˆ–≈œ¢¿¥œÏ”¶
+	//ÂæóÂà∞portidÔºåËøô‰∏™ÈúÄË¶ÅÂèëÈÄÅÂÜÖÂÜÖÊ†∏ÔºåÂÜÖÊ†∏‰æùËµñËøô‰∏™‰ø°ÊÅØÊù•ÂìçÂ∫î
     sock->pid = local.nl_pid;		
-    °≠°≠
+    ‚Ä¶‚Ä¶
     free(sock);
     return retval;
 }
@@ -154,20 +156,20 @@ int nl_sock_create(int protocol, struct nl_sock **sockp)
 ```
 
 
-## ”√ªßÃ¨ π”√Netlink Socket
+# Áî®Êà∑ÊÄÅ‰ΩøÁî®Netlink Socket
 ```
 static int nl_sock_transact_multiple__(struct nl_sock *sock,
                             struct nl_transaction **transactions, size_t n,
                             size_t *done)
 {
-    °≠°≠
+    ‚Ä¶‚Ä¶
     for (i = 0; i < n; i++) {
         struct nl_transaction *txn = transactions[i];
         struct nlmsghdr *nlmsg = nl_msg_nlmsghdr(txn->request);
 
         nlmsg->nlmsg_len = txn->request->size;
         nlmsg->nlmsg_seq = base_seq + i;
-		//¥¥Ω®socket ±µ√µΩµƒpid
+		//ÂàõÂª∫socketÊó∂ÂæóÂà∞ÁöÑpid
         nlmsg->nlmsg_pid = sock->pid;              
 
         iovs[i].iov_base = txn->request->data;
@@ -178,22 +180,23 @@ static int nl_sock_transact_multiple__(struct nl_sock *sock,
     msg.msg_iov = iovs;
     msg.msg_iovlen = n;
     do {
-	    //µ˜”√linuxµƒsendmsg∫Ø ˝£¨∑¢ÀÕgenlinkœ˚œ¢
+	    //Ë∞ÉÁî®linuxÁöÑsendmsgÂáΩÊï∞ÔºåÂèëÈÄÅgenlinkÊ∂àÊÅØ
         error = sendmsg(sock->fd, &msg, 0) < 0 ? errno : 0;   
     } while (error == EINTR);
 
-     °≠°≠
+     ‚Ä¶‚Ä¶
     /* Receive a reply. */
-	//Ω” ’genlink œ˚œ¢£¨º¥«Î«Ûµƒreply£¨Õ®π˝µ˜”√recvmsg µœ÷
+	//Êé•Êî∂genlink Ê∂àÊÅØÔºåÂç≥ËØ∑Ê±ÇÁöÑreplyÔºåÈÄöËøáË∞ÉÁî®recvmsgÂÆûÁé∞
     error = nl_sock_recv__(sock, buf_txn->reply, false);	
-    °≠°≠
+    ‚Ä¶‚Ä¶
 }
 
 ```
 
-## ƒ⁄∫ÀÃ¨◊¢≤·¥¶¿Ì∫Ø ˝
 
-genl_family∂®“Â£∫
+# ÂÜÖÊ†∏ÊÄÅÊ≥®ÂÜåÂ§ÑÁêÜÂáΩÊï∞
+
+genl_familyÂÆö‰πâÔºö
 ```
 static struct genl_family dp_flow_genl_family = {
 	.id = GENL_ID_GENERATE,
@@ -210,7 +213,7 @@ static struct genl_family dp_flow_genl_family = {
 };
 ```
 
-netlinkœ˚œ¢¥¶¿Ì∫Ø ˝£∫
+netlinkÊ∂àÊÅØÂ§ÑÁêÜÂáΩÊï∞Ôºö
 ```
 static struct genl_ops dp_flow_genl_ops[] = {
 	{ .cmd = OVS_FLOW_CMD_NEW,
@@ -237,7 +240,7 @@ static struct genl_ops dp_flow_genl_ops[] = {
 };
 ```
 
-◊¢≤·genl_family£∫
+Ê≥®ÂÜågenl_familyÔºö
 ```
 static int dp_register_genl(void)
 {
@@ -260,26 +263,26 @@ error:
 ```
 
 
-## Netlinkœ˚œ¢Õ∑∂®“Â
+# NetlinkÊ∂àÊÅØÂ§¥ÂÆö‰πâ
 
-NetlinkÕ®–≈ ±£¨”–±Í◊ºœ˚œ¢∏Ò Ω∂®“Â£¨≥˝nlmsghdr∫Õgenlmsghdr¡Ω∏ˆ±Í◊ºœ˚œ¢Õ∑Õ‚£¨ªπ÷ß≥÷”√ªß◊‘∂®“Âµƒ ˝æ›°£
+NetlinkÈÄö‰ø°Êó∂ÔºåÊúâÊ†áÂáÜÊ∂àÊÅØÊ†ºÂºèÂÆö‰πâÔºåÈô§nlmsghdrÂíågenlmsghdr‰∏§‰∏™Ê†áÂáÜÊ∂àÊÅØÂ§¥Â§ñÔºåËøòÊîØÊåÅÁî®Êà∑Ëá™ÂÆö‰πâÁöÑÊï∞ÊçÆ„ÄÇ
 
 ![netlink-data](images/netlink-data.png "netlink-data")
 
 
-genl_ops∫Ø ˝ø…“‘÷±Ω”µ√µΩnlattr Ù–‘÷µ
+genl_opsÂáΩÊï∞ÂèØ‰ª•Áõ¥Êé•ÂæóÂà∞nlattrÂ±ûÊÄßÂÄº
 ```
 static int ovs_vport_cmd_new(struct sk_buff *skb, struct genl_info *info)
 {
      struct nlattr **a = info->attrs;
-     °≠°≠
+     ‚Ä¶‚Ä¶
      if (!a[OVS_VPORT_ATTR_NAME] || !a[OVS_VPORT_ATTR_TYPE] ||
            !a[OVS_VPORT_ATTR_UPCALL_PID])
-     °≠°≠
+     ‚Ä¶‚Ä¶
            parms.name = nla_data(a[OVS_VPORT_ATTR_NAME]);
            parms.type = nla_get_u32(a[OVS_VPORT_ATTR_TYPE]);
            parms.options = a[OVS_VPORT_ATTR_OPTIONS];
-           °≠°≠
+           ‚Ä¶‚Ä¶
 }
 ```
 
