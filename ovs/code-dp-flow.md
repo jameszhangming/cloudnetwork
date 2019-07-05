@@ -210,16 +210,23 @@ static struct sw_flow *masked_flow_lookup(struct table_instance *ti,
 	u32 hash;
 	struct sw_flow_key masked_key;
 
-	ovs_flow_mask_key(&masked_key, unmasked, false, mask);
-	hash = flow_hash(&masked_key, &mask->range);
+	ovs_flow_mask_key(&masked_key, unmasked, false, mask);    //根据mask计算出masked_key
+	hash = flow_hash(&masked_key, &mask->range);              //使用masked_key和range算出hash key，即flow->key的值
 	head = find_bucket(ti, hash);
 	(*n_mask_hit)++;
 	hlist_for_each_entry_rcu(flow, head, flow_table.node[ti->node_ver]) {
-		if (flow->mask == mask && flow->flow_table.hash == hash &&
-		    flow_cmp_masked_key(flow, &masked_key, &mask->range))
+		if (flow->mask == mask && flow->flow_table.hash == hash &&    //flow使用mask与当前的mask相同
+		    flow_cmp_masked_key(flow, &masked_key, &mask->range))     //比较masked_key是否匹配flow
 			return flow;
 	}
 	return NULL;
+}
+
+static bool flow_cmp_masked_key(const struct sw_flow *flow,
+				const struct sw_flow_key *key,
+				const struct sw_flow_key_range *range)
+{
+	return cmp_key(&flow->key, key, range->start, range->end);    //根据指定的范围对比key值
 }
 ```
 
@@ -234,10 +241,10 @@ static struct sw_flow *masked_flow_lookup(struct table_instance *ti,
   1. 如果skb->hash有值，直接根据该值找到相应的entry，如果通过该entry未查到流表，则从0号开始遍历mask_cache_entry数组（慢查询）
   2. 如果skb->hash未设置，从0号开始遍历mask_cache_entry数组（慢查询）
 2. 根据前一步的entry的mask_index成员找到mask，如果通过该mask未找到flow，则会遍历整个mask数组（慢查询）
-3. 根据mask和key得到masked_key；
-4. 根据masked_key和mask计算出hash；
+3. 根据mask->key和key得到masked_key；
+4. 根据masked_key和mask->range计算出hash；
 5. 根据hash值找到bucket，根据bucket找到flow链表；
-6. 遍历flow链表，找到匹配的flow（flow->mask等于mask，flow->hash等于hask，flow内容和masked_key相同）
+6. 遍历flow链表，找到匹配的flow（flow->mask等于mask，flow->hash等于hask，flow->key和masked_key相同）
 7. 刷新mask_cache_entry数组的mask_index值（下次同类报文可以快速匹配）
 
 ## OVS流表查找总结
