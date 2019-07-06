@@ -629,7 +629,7 @@ dpif_netlink_port_add__(struct dpif_netlink *dpif, struct netdev *netdev,
     int error = 0;
 
     if (dpif->handlers) {
-        socksp = vport_create_socksp(dpif, &error);
+        socksp = vport_create_socksp(dpif, &error);    //创建nl_sock
         if (!socksp) {
             return error;
         }
@@ -680,7 +680,7 @@ dpif_netlink_port_add__(struct dpif_netlink *dpif, struct netdev *netdev,
     }
 
     request.port_no = *port_nop;
-    upcall_pids = vport_socksp_to_pids(socksp, dpif->n_handlers);
+    upcall_pids = vport_socksp_to_pids(socksp, dpif->n_handlers);   //upcallpids就是nl_sock的pid对象，该值根据创建sock的线程计算得到
     request.n_upcall_pids = socksp ? dpif->n_handlers : 1;
     request.upcall_pids = upcall_pids;
 
@@ -708,7 +708,7 @@ dpif_netlink_port_add__(struct dpif_netlink *dpif, struct netdev *netdev,
             request.cmd = OVS_VPORT_CMD_DEL;
             request.dp_ifindex = dpif->dp_ifindex;
             request.port_no = *port_nop;
-            dpif_netlink_vport_transact(&request, NULL, NULL);
+            dpif_netlink_vport_transact(&request, NULL, NULL);     //发送netlink 报文
             vport_del_socksp(dpif, socksp);
             goto exit;
         }

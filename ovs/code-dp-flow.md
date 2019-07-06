@@ -1,18 +1,4 @@
-# OVS数据面流表查找
-
-OVS数据面流表查找是网络性能的关键，核心目标是根据SKB报文快速匹配到流表，OVS流表的设计点包括：
-
-* 流表数量不能太多
-  * 需要提供流表老化的机制
-  * 流表老化后，未匹配到流表采用upcall到用户态来下发流表
-* 充分利用硬件能力
-  * 使用skb->hash值来进行快速流表匹配
-* 报文时间上的连续性
-  * 第一次慢匹配，后续快速匹配
-* 流表匹配优化
-  * 通过连续的内存匹配代替逐个字段的匹配
-
-# 主要数据结构
+# 数据结构
 
 ![flow-object](images/flow-object.png "flow-object")
 
@@ -26,7 +12,9 @@ OVS数据面流表查找是网络性能的关键，核心目标是根据SKB报�
   * 存放mask对象，通过mask和key查找flow
 
   
-# 流表查找代码流程
+# 代码流程
+
+OVS数据面流表查找是网络性能的关键，核心目标是根据SKB报文快速匹配到流表：
 
 ```
 int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
@@ -231,7 +219,7 @@ static bool flow_cmp_masked_key(const struct sw_flow *flow,
 ```
 
 
-# 流表查找流程
+# 流程总结
 
 ![flow-progress](images/flow-progress.png "flow-progress")
 
@@ -247,14 +235,22 @@ static bool flow_cmp_masked_key(const struct sw_flow *flow,
 6. 遍历flow链表，找到匹配的flow（flow->mask等于mask，flow->hash等于hask，flow->key和masked_key相同）
 7. 刷新mask_cache_entry数组的mask_index值（下次同类报文可以快速匹配）
 
-## OVS流表查找总结
+
+OVS流表的设计点总结：
+
+* 流表数量不能太多
+  * 需要提供流表老化的机制
+  * 流表老化后，未匹配到流表采用upcall到用户态来下发流表
+* 充分利用硬件能力
+  * 使用skb->hash值来进行快速流表匹配
+* 报文时间上的连续性
+  * 第一次慢匹配，后续快速匹配
+* 流表匹配优化
+  * 通过连续的内存匹配代替逐个字段的匹配
+
+OVS性能优化分析：
 
 * mask数量要少
   * mask的数量对流表查找的性能影响非常大，要尽量减少mask的数量
   * mask的数量和流表中使用的字段种类相关，要减少不同报文字段匹配的数量
 * 报文进入OVS时全量的key解析有点浪费
-
-
-# 内核流表更新
-
-![flow-update](images/flow-update.png "flow-update")
