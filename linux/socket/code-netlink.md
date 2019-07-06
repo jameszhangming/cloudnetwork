@@ -2,7 +2,10 @@
 
 Netlink是Linux系统用于用户态和内核态进行通信的机制，本文将介绍Netlink Socket的工作原理
 
-## Netlink procotol
+
+# Netlink procotol
+
+netlink family sock支持如下协议：
 
 ```c
 #define NETLINK_ROUTE		0	/* Routing/device hook				*/
@@ -29,7 +32,10 @@ Netlink是Linux系统用于用户态和内核态进行通信的机制，本文�
 #define NETLINK_CRYPTO		21	/* Crypto layer */
 ```
 
-## 创建用户态Netlink Socket
+
+# Netlink Socket创建(用户态)
+
+用户态通过调用socket(AF_NETLINK, SOCK_RAW, protocol)来创建netlink sock，最终会调用netlink family的ops来创建sock。
 
 ```c
 static const struct net_proto_family netlink_family_ops = {
@@ -129,7 +135,8 @@ static int __netlink_create(struct net *net, struct socket *sock,
 }
 ```
 
-## 用户态Netlink Socket消息接收和发送
+
+## Netlink Sock操作
 
 ```c
 static const struct proto_ops netlink_ops = {
@@ -154,7 +161,220 @@ static const struct proto_ops netlink_ops = {
 };
 ```
 
-### 用户态Netlink Socket发送消息
+
+## Netlink Socket Connect(用户态)
+
+用户态netlink sock创建后，一般通过connect调用与内核态sock建立关联，实现用户态和内核态通信。
+
+```
+static int netlink_connect(struct socket *sock, struct sockaddr *addr,
+			   int alen, int flags)
+{
+	int err = 0;
+	struct sock *sk = sock->sk;
+	struct netlink_sock *nlk = nlk_sk(sk);
+	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
+
+	if (alen < sizeof(addr->sa_family))
+		return -EINVAL;
+
+	if (addr->sa_family == AF_UNSPEC) {
+		sk->sk_state	= NETLINK_UNCONNECTED;
+		nlk->dst_portid	= 0;
+		nlk->dst_group  = 0;
+		return 0;
+	}
+	if (addr->sa_family != AF_NETLINK)
+		return -EINVAL;
+
+	if ((nladdr->nl_groups || nladdr->nl_pid) &&
+	    !netlink_allowed(sock, NL_CFG_F_NONROOT_SEND))
+		return -EPERM;
+
+	/* No need for barriers here as we return to user-space without
+	 * using any of the bound attributes.
+	 */
+	if (!nlk->bound)
+		err = netlink_autobind(sock);    //sock bind，系统分配portid
+
+	if (err == 0) {
+		sk->sk_state	= NETLINK_CONNECTED;
+		nlk->dst_portid = nladdr->nl_pid;          //设置目标portid为指定的pid（和内核态sock连接，该值为0）
+		nlk->dst_group  = ffs(nladdr->nl_groups);
+	}
+
+	return err;
+}
+
+static int netlink_autobind(struct socket *sock)
+{
+	struct sock *sk = sock->sk;
+	struct net *net = sock_net(sk);
+	struct netlink_table *table = &nl_table[sk->sk_protocol];
+	s32 portid = task_tgid_vnr(current);    //根据当前进程号计算portid
+	int err;
+	static s32 rover = -4097;
+
+retry:
+	cond_resched();
+	rcu_read_lock();
+	if (__netlink_lookup(table, portid, net)) {
+		/* Bind collision, search negative portid values. */
+		portid = rover--;
+		if (rover > -4097)
+			rover = -4097;
+		rcu_read_unlock();
+		goto retry;
+	}
+	rcu_read_unlock();
+
+	err = netlink_insert(sk, portid);    
+	if (err == -EADDRINUSE)
+		goto retry;
+
+	/* If 2 threads race to autobind, that is fine.  */
+	if (err == -EBUSY)
+		err = 0;
+
+	return err;
+}
+
+static int netlink_insert(struct sock *sk, u32 portid)
+{
+	struct netlink_table *table = &nl_table[sk->sk_protocol];   //每个协议都有一张表
+	int err;
+
+	lock_sock(sk);
+
+	err = nlk_sk(sk)->portid == portid ? 0 : -EBUSY;
+	if (nlk_sk(sk)->bound)
+		goto err;
+
+	err = -ENOMEM;
+	if (BITS_PER_LONG > 32 &&
+	    unlikely(atomic_read(&table->hash.nelems) >= UINT_MAX))
+		goto err;
+
+	nlk_sk(sk)->portid = portid;     //设置sock的portid
+	sock_hold(sk);
+
+	err = __netlink_insert(table, sk);     //把当前sock添加到table中，后续收发包会搜索此表
+	if (err) {
+		/* In case the hashtable backend returns with -EBUSY
+		 * from here, it must not escape to the caller.
+		 */
+		if (unlikely(err == -EBUSY))
+			err = -EOVERFLOW;
+		if (err == -EEXIST)
+			err = -EADDRINUSE;
+		sock_put(sk);
+	}
+
+	/* We need to ensure that the socket is hashed and visible. */
+	smp_wmb();
+	nlk_sk(sk)->bound = portid;
+
+err:
+	release_sock(sk);
+	return err;
+}
+
+static int __netlink_insert(struct netlink_table *table, struct sock *sk)
+{
+	struct netlink_compare_arg arg;
+
+	netlink_compare_arg_init(&arg, sock_net(sk), nlk_sk(sk)->portid);
+	return rhashtable_lookup_insert_key(&table->hash, &arg,
+					    &nlk_sk(sk)->node,
+					    netlink_rhashtable_params);
+}
+```
+
+
+## Netlink Socket Bind(用户态)
+
+用户通过bind调用来绑定netlink sock，绑定后可以使用该sock发送和接收消息。
+
+```
+static int netlink_bind(struct socket *sock, struct sockaddr *addr,
+			int addr_len)
+{
+	struct sock *sk = sock->sk;
+	struct net *net = sock_net(sk);
+	struct netlink_sock *nlk = nlk_sk(sk);
+	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
+	int err;
+	long unsigned int groups = nladdr->nl_groups;
+	bool bound;
+
+	if (addr_len < sizeof(struct sockaddr_nl))
+		return -EINVAL;
+
+	if (nladdr->nl_family != AF_NETLINK)
+		return -EINVAL;
+
+	/* Only superuser is allowed to listen multicasts */
+	if (groups) {
+		if (!netlink_allowed(sock, NL_CFG_F_NONROOT_RECV))
+			return -EPERM;
+		err = netlink_realloc_groups(sk);
+		if (err)
+			return err;
+	}
+
+	bound = nlk->bound;
+	if (bound) {
+		/* Ensure nlk->portid is up-to-date. */
+		smp_rmb();
+
+		if (nladdr->nl_pid != nlk->portid)
+			return -EINVAL;
+	}
+
+	if (nlk->netlink_bind && groups) {
+		int group;
+
+		for (group = 0; group < nlk->ngroups; group++) {
+			if (!test_bit(group, &groups))
+				continue;
+			err = nlk->netlink_bind(net, group + 1);
+			if (!err)
+				continue;
+			netlink_undo_bind(group, groups, sk);
+			return err;
+		}
+	}
+
+	/* No need for barriers here as we return to user-space without
+	 * using any of the bound attributes.
+	 */
+	if (!bound) {
+		err = nladdr->nl_pid ?
+			netlink_insert(sk, nladdr->nl_pid) :    //根据指定的portid插入到内核中
+			netlink_autobind(sock);                 //动态绑定，根据进程ID计算portid
+		if (err) {
+			netlink_undo_bind(nlk->ngroups, groups, sk);
+			return err;
+		}
+	}
+
+	if (!groups && (nlk->groups == NULL || !(u32)nlk->groups[0]))
+		return 0;
+
+	netlink_table_grab();
+	netlink_update_subscriptions(sk, nlk->subscriptions +
+					 hweight32(groups) -
+					 hweight32(nlk->groups[0]));
+	nlk->groups[0] = (nlk->groups[0] & ~0xffffffffUL) | groups;
+	netlink_update_listeners(sk);
+	netlink_table_ungrab();
+
+	return 0;
+}
+```
+
+
+## Netlink Sock发送消息(用户态)
 
 ```c
 static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
@@ -303,6 +523,7 @@ static struct sock *netlink_getsockbyportid(struct sock *ssk, u32 portid)
 	return sock;
 }
 
+//内核接收netlink报文
 static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
 				  struct sock *ssk)
 {
@@ -324,6 +545,7 @@ static int netlink_unicast_kernel(struct sock *sk, struct sk_buff *skb,
 	return ret;
 }
 
+//用户态sock接收netlink报文
 int netlink_sendskb(struct sock *sk, struct sk_buff *skb)
 {
 	int len = __netlink_sendskb(sk, skb);
@@ -351,7 +573,8 @@ static int __netlink_sendskb(struct sock *sk, struct sk_buff *skb)
 }
 ```
 
-### 用户态Netlink Socket接收消息
+
+## Netlink Sock接收消息(用户态)
 
 ```c
 static int netlink_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
@@ -524,52 +747,8 @@ no_packet:
 }
 ```
 
-## 用户态Netlink Socket connect操作
 
-Netlink Socket connect操作可以把用户Socket和内核态Socket绑定，实现用户态和内核态通信， 例如generic netlink
-
-```c
-static int netlink_connect(struct socket *sock, struct sockaddr *addr,
-			   int alen, int flags)
-{
-	int err = 0;
-	struct sock *sk = sock->sk;
-	struct netlink_sock *nlk = nlk_sk(sk);
-	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
-
-	if (alen < sizeof(addr->sa_family))
-		return -EINVAL;
-
-	if (addr->sa_family == AF_UNSPEC) {
-		sk->sk_state	= NETLINK_UNCONNECTED;
-		nlk->dst_portid	= 0;
-		nlk->dst_group  = 0;
-		return 0;
-	}
-	if (addr->sa_family != AF_NETLINK)
-		return -EINVAL;
-
-	if ((nladdr->nl_groups || nladdr->nl_pid) &&
-	    !netlink_allowed(sock, NL_CFG_F_NONROOT_SEND))
-		return -EPERM;
-
-	/* No need for barriers here as we return to user-space without
-	 * using any of the bound attributes.
-	 */
-	if (!nlk->bound)
-		err = netlink_autobind(sock);
-
-	if (err == 0) {
-		sk->sk_state	= NETLINK_CONNECTED;
-		nlk->dst_portid = nladdr->nl_pid;             //设置了dst_portid，在sendmsg中使用
-		nlk->dst_group  = ffs(nladdr->nl_groups);
-	}
-
-	return err;
-}
-```
-
-## 创建内核态Netlink Socket
+# Netlink Sock创建(内核态)
 
 ```c
 static inline struct sock *
@@ -661,7 +840,8 @@ out_sock_release_nosk:
 
 ```
 
-## 内核态Netlink Socket发送消息
+
+## Netlink Sock发送消息(内核态)
 
 ```c
 int netlink_unicast(struct sock *ssk, struct sk_buff *skb,
@@ -719,3 +899,77 @@ static struct sock *netlink_getsockbyportid(struct sock *ssk, u32 portid)
 }
 ```
 
+
+## Netlink Sock接收消息(内核态)
+
+netlink sock内核收包最后都交给netlink_rcv函数进行接收，该函数在netlink_kernel_create调用过程中进行设置。
+
+```c
+static int __net_init genl_pernet_init(struct net *net)
+{
+	struct netlink_kernel_cfg cfg = {
+		.input		= genl_rcv,
+		.flags		= NL_CFG_F_NONROOT_RECV,
+		.bind		= genl_bind,
+		.unbind		= genl_unbind,
+	};
+
+	/* we'll bump the group number right afterwards */
+	net->genl_sock = netlink_kernel_create(net, NETLINK_GENERIC, &cfg);
+
+	if (!net->genl_sock && net_eq(net, &init_net))
+		panic("GENL: Cannot initialize generic netlink\n");
+
+	if (!net->genl_sock)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int __net_init rtnetlink_net_init(struct net *net)
+{
+	struct sock *sk;
+	struct netlink_kernel_cfg cfg = {
+		.groups		= RTNLGRP_MAX,
+		.input		= rtnetlink_rcv,
+		.cb_mutex	= &rtnl_mutex,
+		.flags		= NL_CFG_F_NONROOT_RECV,
+	};
+
+	sk = netlink_kernel_create(net, NETLINK_ROUTE, &cfg);
+	if (!sk)
+		return -ENOMEM;
+	net->rtnl = sk;
+	return 0;
+}
+
+static int __net_init xfrm_user_net_init(struct net *net)
+{
+	struct sock *nlsk;
+	struct netlink_kernel_cfg cfg = {
+		.groups	= XFRMNLGRP_MAX,
+		.input	= xfrm_netlink_rcv,
+	};
+
+	nlsk = netlink_kernel_create(net, NETLINK_XFRM, &cfg);
+	if (nlsk == NULL)
+		return -ENOMEM;
+	net->xfrm.nlsk_stash = nlsk; /* Don't set to NULL */
+	rcu_assign_pointer(net->xfrm.nlsk, nlsk);
+	return 0;
+}
+
+static int __net_init nl_fib_lookup_init(struct net *net)
+{
+	struct sock *sk;
+	struct netlink_kernel_cfg cfg = {
+		.input	= nl_fib_input,
+	};
+
+	sk = netlink_kernel_create(net, NETLINK_FIB_LOOKUP, &cfg);
+	if (!sk)
+		return -EAFNOSUPPORT;
+	net->ipv4.fibnl = sk;
+	return 0;
+}
+```
