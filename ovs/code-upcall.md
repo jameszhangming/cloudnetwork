@@ -770,7 +770,7 @@ free_dupcall:
     }
 
     if (n_upcalls) {
-        handle_upcalls(handler->udpif, upcalls, n_upcalls);
+        handle_upcalls(handler->udpif, upcalls, n_upcalls);      //handle upcalls
         for (i = 0; i < n_upcalls; i++) {
             dp_packet_uninit(&dupcalls[i].packet);
             ofpbuf_uninit(&recv_bufs[i]);
@@ -1180,6 +1180,129 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
     }
 
     return EAGAIN;
+}
+```
+
+
+## handle_upcalls
+
+```c
+
+static void
+handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
+               size_t n_upcalls)
+{
+    struct dpif_op *opsp[UPCALL_MAX_BATCH * 2];
+    struct ukey_op ops[UPCALL_MAX_BATCH * 2];
+    unsigned int flow_limit;
+    size_t n_ops, n_opsp, i;
+    bool may_put;
+
+    atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
+
+    may_put = udpif_get_n_flows(udpif) < flow_limit;
+
+    /* Handle the packets individually in order of arrival.
+     *
+     *   - For SLOW_CFM, SLOW_LACP, SLOW_STP, and SLOW_BFD, translation is what
+     *     processes received packets for these protocols.
+     *
+     *   - For SLOW_CONTROLLER, translation sends the packet to the OpenFlow
+     *     controller.
+     *
+     * The loop fills 'ops' with an array of operations to execute in the
+     * datapath. */
+    n_ops = 0;
+    for (i = 0; i < n_upcalls; i++) {
+        struct upcall *upcall = &upcalls[i];
+        const struct dp_packet *packet = upcall->packet;
+        struct ukey_op *op;
+
+        if (upcall->vsp_adjusted) {
+            /* This packet was received on a VLAN splinter port.  We added a
+             * VLAN to the packet to make the packet resemble the flow, but the
+             * actions were composed assuming that the packet contained no
+             * VLAN.  So, we must remove the VLAN header from the packet before
+             * trying to execute the actions. */
+            if (upcall->odp_actions.size) {
+                eth_pop_vlan(CONST_CAST(struct dp_packet *, upcall->packet));
+            }
+
+            /* Remove the flow vlan tags inserted by vlan splinter logic
+             * to ensure megaflow masks generated match the data path flow. */
+            CONST_CAST(struct flow *, upcall->flow)->vlan_tci = 0;
+        }
+
+        /* Do not install a flow into the datapath if:
+         *
+         *    - The datapath already has too many flows.
+         *
+         *    - We received this packet via some flow installed in the kernel
+         *      already.
+         *
+         *    - Upcall was a recirculation but we do not have a reference to
+         *      to the recirculation ID. */
+        if (may_put && upcall->type == DPIF_UC_MISS &&
+            (!upcall->recirc || upcall->have_recirc_ref)) {
+            struct udpif_key *ukey = upcall->ukey;
+
+            upcall->ukey_persists = true;
+            op = &ops[n_ops++];
+
+            op->ukey = ukey;
+            op->dop.type = DPIF_OP_FLOW_PUT;
+            op->dop.u.flow_put.flags = DPIF_FP_CREATE;
+            op->dop.u.flow_put.key = ukey->key;
+            op->dop.u.flow_put.key_len = ukey->key_len;
+            op->dop.u.flow_put.mask = ukey->mask;
+            op->dop.u.flow_put.mask_len = ukey->mask_len;
+            op->dop.u.flow_put.ufid = upcall->ufid;
+            op->dop.u.flow_put.stats = NULL;
+            ukey_get_actions(ukey, &op->dop.u.flow_put.actions,
+                             &op->dop.u.flow_put.actions_len);
+        }
+
+        if (upcall->odp_actions.size) {
+            op = &ops[n_ops++];
+            op->ukey = NULL;
+            op->dop.type = DPIF_OP_EXECUTE;
+            op->dop.u.execute.packet = CONST_CAST(struct dp_packet *, packet);
+            odp_key_to_pkt_metadata(upcall->key, upcall->key_len,
+                                    &op->dop.u.execute.packet->md);
+            op->dop.u.execute.actions = upcall->odp_actions.data;
+            op->dop.u.execute.actions_len = upcall->odp_actions.size;
+            op->dop.u.execute.needs_help = (upcall->xout.slow & SLOW_ACTION) != 0;
+            op->dop.u.execute.probe = false;
+            op->dop.u.execute.mtu = upcall->mru;
+        }
+    }
+
+    /* Execute batch.
+     *
+     * We install ukeys before installing the flows, locking them for exclusive
+     * access by this thread for the period of installation. This ensures that
+     * other threads won't attempt to delete the flows as we are creating them.
+     */
+    n_opsp = 0;
+    for (i = 0; i < n_ops; i++) {
+        struct udpif_key *ukey = ops[i].ukey;
+
+        if (ukey) {
+            /* If we can't install the ukey, don't install the flow. */
+            if (!ukey_install_start(udpif, ukey)) {
+                ukey_delete__(ukey);
+                ops[i].ukey = NULL;
+                continue;
+            }
+        }
+        opsp[n_opsp++] = &ops[i].dop;
+    }
+    dpif_operate(udpif->dpif, opsp, n_opsp);
+    for (i = 0; i < n_ops; i++) {
+        if (ops[i].ukey) {
+            ukey_install_finish(ops[i].ukey, ops[i].dop.error);
+        }
+    }
 }
 ```
 
