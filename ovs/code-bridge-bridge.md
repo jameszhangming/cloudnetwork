@@ -7,6 +7,12 @@ bridge操作的总入口是bridge_reconfigure函数。
 
 # bridge_reconfigure
 
+bridge相关操作流程为：
+
+1. add_del_bridges 添加或删除bridges
+2. bridge_delete_ofprotos 删除未配置或配置错误的of bridge
+3. ofproto_create 为bridge创建对应的of bridge
+
 ```c
 static void
 bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
@@ -36,7 +42,7 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
      *
      * This is mostly an update to bridge data structures. Nothing is pushed
      * down to ofproto or lower layers. */
-    add_del_bridges(ovs_cfg);
+    add_del_bridges(ovs_cfg);                           // 添加删除bridges
     splinter_vlans = collect_splinter_vlans(ovs_cfg);
     HMAP_FOR_EACH (br, node, &all_bridges) {
         bridge_collect_wanted_ports(br, splinter_vlans, &br->wanted_ports);
@@ -56,7 +62,7 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
      * We have to do all the deletions before we can do any additions, because
      * the ports to be added might require resources that will be freed up by
      * deletions (they might especially overlap in name). */
-    bridge_delete_ofprotos();
+    bridge_delete_ofprotos();                           //删除未配置或配置错误的of bridge
     HMAP_FOR_EACH (br, node, &all_bridges) {
         if (br->ofproto) {
             bridge_delete_or_reconfigure_ports(br);     //of层删除或重置端口
@@ -278,3 +284,34 @@ bridge_create(const struct ovsrec_bridge *br_cfg)
 }
 ```
 
+
+# bridge_delete_ofprotos
+
+```c
+static void
+bridge_delete_ofprotos(void)
+{
+    struct bridge *br;
+    struct sset names;
+    struct sset types;
+    const char *type;
+
+    /* Delete ofprotos with no bridge or with the wrong type. */
+    sset_init(&names);
+    sset_init(&types);
+    ofproto_enumerate_types(&types);
+    SSET_FOR_EACH (type, &types) {
+        const char *name;
+
+        ofproto_enumerate_names(type, &names);
+        SSET_FOR_EACH (name, &names) {
+            br = bridge_lookup(name);
+            if (!br || strcmp(type, br->type)) {
+                ofproto_delete(name, type);
+            }
+        }
+    }
+    sset_destroy(&names);
+    sset_destroy(&types);
+}
+```
