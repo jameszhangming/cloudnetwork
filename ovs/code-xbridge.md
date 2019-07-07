@@ -2,6 +2,10 @@
 
 xbridge/xbundle/xport用于xlate，在bridge_reconfigure函数处理完bridge和port之后，调用bridge_run__函数实现xbridge/xbundle/xport对象构建。
 
+数据结构如下：
+
+![xbridge](images/xbridge.png "xbridge")
+
 ```c
 static void
 bridge_run__(void)
