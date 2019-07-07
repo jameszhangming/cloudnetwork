@@ -1065,6 +1065,27 @@ xlate_lookup_ofproto_(const struct dpif_backer *backer, const struct flow *flow,
     }
     return xport->xbridge->ofproto;
 }
+
+static struct xport *
+xport_lookup(struct xlate_cfg *xcfg, const struct ofport_dpif *ofport)
+{
+    struct hmap *xports;
+    struct xport *xport;
+
+    if (!ofport || !xcfg) {
+        return NULL;
+    }
+
+    xports = &xcfg->xports;
+
+    HMAP_FOR_EACH_IN_BUCKET (xport, hmap_node, hash_pointer(ofport, 0),
+                             xports) {
+        if (xport->ofport == ofport) {
+            return xport;
+        }
+    }
+    return NULL;
+}
 ```
 
 
