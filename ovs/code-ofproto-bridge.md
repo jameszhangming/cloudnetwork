@@ -6,7 +6,7 @@
   * 调用ofproto_delete删除of bridge
 * bridge_reconfigure函数
   * 调用ofproto_create创建of bridge
-  
+
 
 # ofproto_create
 
