@@ -1089,7 +1089,7 @@ xport_lookup(struct xlate_cfg *xcfg, const struct ofport_dpif *ofport)
 ```
 
 
-## process_upcall
+## process_upcall(处理upcall)
 
 ```c
 static int
@@ -1184,7 +1184,7 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
 ```
 
 
-## handle_upcalls
+## handle_upcalls(处理upcall结果)
 
 ```c
 
@@ -1200,7 +1200,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
 
     atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
 
-    may_put = udpif_get_n_flows(udpif) < flow_limit;
+    may_put = udpif_get_n_flows(udpif) < flow_limit;     //检查数据面的流表数是否超过上限
 
     /* Handle the packets individually in order of arrival.
      *
@@ -1243,7 +1243,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
          *    - Upcall was a recirculation but we do not have a reference to
          *      to the recirculation ID. */
         if (may_put && upcall->type == DPIF_UC_MISS &&
-            (!upcall->recirc || upcall->have_recirc_ref)) {
+            (!upcall->recirc || upcall->have_recirc_ref)) {    //进此流程
             struct udpif_key *ukey = upcall->ukey;
 
             upcall->ukey_persists = true;
@@ -1258,7 +1258,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
             op->dop.u.flow_put.mask_len = ukey->mask_len;
             op->dop.u.flow_put.ufid = upcall->ufid;
             op->dop.u.flow_put.stats = NULL;
-            ukey_get_actions(ukey, &op->dop.u.flow_put.actions,
+            ukey_get_actions(ukey, &op->dop.u.flow_put.actions,   //ukey的actions根据upcall的put_action生成
                              &op->dop.u.flow_put.actions_len);
         }
 
@@ -1289,7 +1289,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
 
         if (ukey) {
             /* If we can't install the ukey, don't install the flow. */
-            if (!ukey_install_start(udpif, ukey)) {
+            if (!ukey_install_start(udpif, ukey)) {      //ukey install，如果成功则可以安装flow
                 ukey_delete__(ukey);
                 ops[i].ukey = NULL;
                 continue;
@@ -1297,12 +1297,62 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
         }
         opsp[n_opsp++] = &ops[i].dop;
     }
-    dpif_operate(udpif->dpif, opsp, n_opsp);
+    dpif_operate(udpif->dpif, opsp, n_opsp);     //执行actions
     for (i = 0; i < n_ops; i++) {
         if (ops[i].ukey) {
             ukey_install_finish(ops[i].ukey, ops[i].dop.error);
         }
     }
+}
+
+static void
+ukey_get_actions(struct udpif_key *ukey, const struct nlattr **actions, size_t *size)
+{
+    const struct ofpbuf *buf = ovsrcu_get(struct ofpbuf *, &ukey->actions);
+    *actions = buf->data;
+    *size = buf->size;
+}
+
+static bool
+ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
+    OVS_TRY_LOCK(true, new_ukey->mutex)
+{
+    struct umap *umap;
+    struct udpif_key *old_ukey;
+    uint32_t idx;
+    bool locked = false;
+
+    idx = new_ukey->hash % N_UMAPS;
+    umap = &udpif->ukeys[idx];        //数组map，得到ukey对应的map
+    ovs_mutex_lock(&umap->mutex);
+    old_ukey = ukey_lookup(udpif, &new_ukey->ufid);
+    if (old_ukey) {
+        /* Uncommon case: A ukey is already installed with the same UFID. */
+        if (old_ukey->key_len == new_ukey->key_len
+            && !memcmp(old_ukey->key, new_ukey->key, new_ukey->key_len)) {
+            COVERAGE_INC(handler_duplicate_upcall);
+        } else {
+            struct ds ds = DS_EMPTY_INITIALIZER;
+
+            odp_format_ufid(&old_ukey->ufid, &ds);
+            ds_put_cstr(&ds, " ");
+            odp_flow_key_format(old_ukey->key, old_ukey->key_len, &ds);
+            ds_put_cstr(&ds, "\n");
+            odp_format_ufid(&new_ukey->ufid, &ds);
+            ds_put_cstr(&ds, " ");
+            odp_flow_key_format(new_ukey->key, new_ukey->key_len, &ds);
+
+            VLOG_WARN_RL(&rl, "Conflicting ukey for flows:\n%s", ds_cstr(&ds));
+            ds_destroy(&ds);
+        }
+    } else {
+        ovs_mutex_lock(&new_ukey->mutex);
+        cmap_insert(&umap->cmap, &new_ukey->cmap_node, new_ukey->hash);    //插入到bucket中
+        locked = true;
+    }
+    ovs_mutex_unlock(&umap->mutex);
+
+    return locked;
 }
 ```
 
