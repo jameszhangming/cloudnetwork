@@ -5,7 +5,7 @@ port操作的总入口是bridge_reconfigure函数， 调用流程如下：
 1. bridge_del_ports 删除端口
 2. bridge_delete_or_reconfigure_ports 删除重置端口
 3. bridge_add_ports 添加端口
-
+4. port_configure 配置端口
 
 # bridge_del_ports(删除端口)
 
@@ -738,4 +738,111 @@ static const struct netdev_class OVS_UNUSED dpdk_vhost_user_class =
 调用流程：
 
 ![port-add-flow](images/port-add-flow.png "port-add-flow")
+
+
+# port_configure
+
+处理vlan（access/trunk等等）、bond（lacp）等端口配置。
+
+```c
+
+static void
+port_configure(struct port *port)
+{
+    const struct ovsrec_port *cfg = port->cfg;
+    struct bond_settings bond_settings;
+    struct lacp_settings lacp_settings;
+    struct ofproto_bundle_settings s;
+    struct iface *iface;
+
+    if (cfg->vlan_mode && !strcmp(cfg->vlan_mode, "splinter")) {
+        configure_splinter_port(port);
+        return;
+    }
+
+    /* Get name. */
+    s.name = port->name;
+
+    /* Get slaves. */
+    s.n_slaves = 0;
+    s.slaves = xmalloc(list_size(&port->ifaces) * sizeof *s.slaves);
+    LIST_FOR_EACH (iface, port_elem, &port->ifaces) {
+        s.slaves[s.n_slaves++] = iface->ofp_port;
+    }
+
+    /* Get VLAN tag. */
+    s.vlan = -1;
+    if (cfg->tag && *cfg->tag >= 0 && *cfg->tag <= 4095) {
+        s.vlan = *cfg->tag;
+    }
+
+    /* Get VLAN trunks. */
+    s.trunks = NULL;
+    if (cfg->n_trunks) {
+        s.trunks = vlan_bitmap_from_array(cfg->trunks, cfg->n_trunks);
+    }
+
+    /* Get VLAN mode. */
+    if (cfg->vlan_mode) {
+        if (!strcmp(cfg->vlan_mode, "access")) {
+            s.vlan_mode = PORT_VLAN_ACCESS;
+        } else if (!strcmp(cfg->vlan_mode, "trunk")) {
+            s.vlan_mode = PORT_VLAN_TRUNK;
+        } else if (!strcmp(cfg->vlan_mode, "native-tagged")) {
+            s.vlan_mode = PORT_VLAN_NATIVE_TAGGED;
+        } else if (!strcmp(cfg->vlan_mode, "native-untagged")) {
+            s.vlan_mode = PORT_VLAN_NATIVE_UNTAGGED;
+        } else {
+            /* This "can't happen" because ovsdb-server should prevent it. */
+            VLOG_WARN("port %s: unknown VLAN mode %s, falling "
+                      "back to trunk mode", port->name, cfg->vlan_mode);
+            s.vlan_mode = PORT_VLAN_TRUNK;
+        }
+    } else {
+        if (s.vlan >= 0) {
+            s.vlan_mode = PORT_VLAN_ACCESS;
+            if (cfg->n_trunks) {
+                VLOG_WARN("port %s: ignoring trunks in favor of implicit vlan",
+                          port->name);
+            }
+        } else {
+            s.vlan_mode = PORT_VLAN_TRUNK;
+        }
+    }
+    s.use_priority_tags = smap_get_bool(&cfg->other_config, "priority-tags",
+                                        false);
+
+    /* Get LACP settings. */
+    s.lacp = port_configure_lacp(port, &lacp_settings);     //配置lacp
+    if (s.lacp) {
+        size_t i = 0;
+
+        s.lacp_slaves = xmalloc(s.n_slaves * sizeof *s.lacp_slaves);
+        LIST_FOR_EACH (iface, port_elem, &port->ifaces) {
+            iface_configure_lacp(iface, &s.lacp_slaves[i++]);
+        }
+    } else {
+        s.lacp_slaves = NULL;
+    }
+
+    /* Get bond settings. */
+    if (s.n_slaves > 1) {
+        s.bond = &bond_settings;
+        port_configure_bond(port, &bond_settings);    //配置bond
+    } else {
+        s.bond = NULL;
+        LIST_FOR_EACH (iface, port_elem, &port->ifaces) {
+            netdev_set_miimon_interval(iface->netdev, 0);
+        }
+    }
+
+    /* Register. */
+    ofproto_bundle_register(port->bridge->ofproto, port, &s);    //注册of bundle
+
+    /* Clean up. */
+    free(s.slaves);
+    free(s.trunks);
+    free(s.lacp_slaves);
+}
+```
 
