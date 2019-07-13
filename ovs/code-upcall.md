@@ -1297,7 +1297,7 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
         }
         opsp[n_opsp++] = &ops[i].dop;
     }
-    dpif_operate(udpif->dpif, opsp, n_opsp);     //执行actions
+    dpif_operate(udpif->dpif, opsp, n_opsp);     //执行actions，执行flow插入到dp
     for (i = 0; i < n_ops; i++) {
         if (ops[i].ukey) {
             ukey_install_finish(ops[i].ukey, ops[i].dop.error);
@@ -1305,16 +1305,14 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
     }
 }
 
-static void
-ukey_get_actions(struct udpif_key *ukey, const struct nlattr **actions, size_t *size)
+static void ukey_get_actions(struct udpif_key *ukey, const struct nlattr **actions, size_t *size)
 {
     const struct ofpbuf *buf = ovsrcu_get(struct ofpbuf *, &ukey->actions);
     *actions = buf->data;
     *size = buf->size;
 }
 
-static bool
-ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
+static bool ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
     OVS_TRY_LOCK(true, new_ukey->mutex)
 {
     struct umap *umap;
