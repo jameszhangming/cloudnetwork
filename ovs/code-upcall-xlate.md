@@ -100,7 +100,7 @@ upcall_xlate(struct udpif *udpif, struct upcall *upcall,
      * going to create new datapath flows for actual datapath misses, there is
      * no point in creating a ukey otherwise. */
     if (upcall->type == DPIF_UC_MISS) {
-        upcall->ukey = ukey_create_from_upcall(upcall, wc);    //创建ukey
+        upcall->ukey = ukey_create_from_upcall(upcall, wc);    //创建ukey， ukey的key值为skb的key值
     }
 }
 ```

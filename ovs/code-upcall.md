@@ -739,7 +739,7 @@ recv_upcalls(struct handler *handler)
             goto free_dupcall;
         }
 
-        upcall->key = dupcall->key;
+        upcall->key = dupcall->key;             //报文的key
         upcall->key_len = dupcall->key_len;
         upcall->ufid = &dupcall->ufid;
 
