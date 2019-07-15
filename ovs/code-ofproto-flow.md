@@ -512,8 +512,7 @@ handle_flow_mod__(struct ofproto *ofproto, struct ofproto_flow_mod *ofm,
 解析openflow消息
 
 ```c
-enum ofperr
-ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
+enum ofperr ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
                         const struct ofp_header *oh,
                         enum ofputil_protocol protocol,
                         struct ofpbuf *ofpacts,
@@ -709,8 +708,7 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
 ### ofputil_pull_ofp11_match
 
 ```c
-enum ofperr
-ofputil_pull_ofp11_match(struct ofpbuf *buf, struct match *match,
+enum ofperr ofputil_pull_ofp11_match(struct ofpbuf *buf, struct match *match,
                          uint16_t *padded_match_len)
 {
     struct ofp11_match_header *omh = buf->data;
@@ -747,8 +745,7 @@ ofputil_pull_ofp11_match(struct ofpbuf *buf, struct match *match,
     }
 }
 
-enum ofperr
-ofputil_match_from_ofp11_match(const struct ofp11_match *ofmatch,
+enum ofperr ofputil_match_from_ofp11_match(const struct ofp11_match *ofmatch,
                                struct match *match)
 {
     uint16_t wc = ntohl(ofmatch->wildcards);
@@ -1143,8 +1140,7 @@ ofproto_flow_mod_finish(struct ofproto *ofproto,
 # 添加流表
 
 ```c
-static enum ofperr
-add_flow_start(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
+static enum ofperr add_flow_start(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct ofputil_flow_mod *fm = &ofm->fm;
@@ -1246,15 +1242,13 @@ add_flow_start(struct ofproto *ofproto, struct ofproto_flow_mod *ofm)
 ## cls_rule_init
 
 ```c
-void
-cls_rule_init(struct cls_rule *rule, const struct match *match, int priority)
+void cls_rule_init(struct cls_rule *rule, const struct match *match, int priority)
 {
-    cls_rule_init__(rule, priority);
-    minimatch_init(CONST_CAST(struct minimatch *, &rule->match), match);
+    cls_rule_init__(rule, priority);   //设置rule的优先级
+    minimatch_init(CONST_CAST(struct minimatch *, &rule->match), match);   //根据match初始化minimatch
 }
 
-void
-minimatch_init(struct minimatch *dst, const struct match *src)
+void minimatch_init(struct minimatch *dst, const struct match *src)
 {
     struct miniflow tmp;
 
@@ -1265,8 +1259,7 @@ minimatch_init(struct minimatch *dst, const struct match *src)
     minimask_init(dst->mask, &src->wc);
 }
 
-void
-miniflow_map_init(struct miniflow *flow, const struct flow *src)
+void miniflow_map_init(struct miniflow *flow, const struct flow *src)
 {
     /* Initialize map, counting the number of nonzero elements. */
     flowmap_init(&flow->map);
@@ -1277,12 +1270,11 @@ miniflow_map_init(struct miniflow *flow, const struct flow *src)
     }
 }
 
-size_t
-miniflow_alloc(struct miniflow *dsts[], size_t n, const struct miniflow *src)
+size_t miniflow_alloc(struct miniflow *dsts[], size_t n, const struct miniflow *src)
 {
     size_t n_values = miniflow_n_values(src);
     size_t data_size = MINIFLOW_VALUES_SIZE(n_values);
-    struct miniflow *dst = xmalloc(n * (sizeof *src + data_size));   //minimatch的成员为union，但是数据结构是相同的，只是区分了名字和用途
+    struct miniflow *dst = xmalloc(n * (sizeof *src + data_size));  //minimatch的成员为union，但是数据结构是相同的，只是区分了名字和用途
     size_t i;
 
     COVERAGE_INC(miniflow_malloc);
@@ -1296,8 +1288,7 @@ miniflow_alloc(struct miniflow *dsts[], size_t n, const struct miniflow *src)
     return data_size;
 }
 
-void
-miniflow_init(struct miniflow *dst, const struct flow *src)
+void miniflow_init(struct miniflow *dst, const struct flow *src)
 {
     uint64_t *dst_u64 = miniflow_values(dst);
     size_t idx;
@@ -1307,8 +1298,7 @@ miniflow_init(struct miniflow *dst, const struct flow *src)
     }
 }
 
-void
-minimask_init(struct minimask *mask, const struct flow_wildcards *wc)
+void minimask_init(struct minimask *mask, const struct flow_wildcards *wc)
 {
     miniflow_init(&mask->masks, &wc->masks);
 }
@@ -1598,11 +1588,53 @@ rule_construct(struct rule *rule_)
 ```
 
 
-## replace_rule_start
+## get_conjunctions
 
 ```c
 static void
-replace_rule_start(struct ofproto *ofproto, cls_version_t version,
+get_conjunctions(const struct ofputil_flow_mod *fm,
+                 struct cls_conjunction **conjsp, size_t *n_conjsp)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    struct cls_conjunction *conjs = NULL;
+    int n_conjs = 0;
+
+    const struct ofpact *ofpact;
+    OFPACT_FOR_EACH (ofpact, fm->ofpacts, fm->ofpacts_len) {
+        if (ofpact->type == OFPACT_CONJUNCTION) {
+            n_conjs++;
+        } else if (ofpact->type != OFPACT_NOTE) {
+            /* "conjunction" may appear with "note" actions but not with any
+             * other type of actions. */
+            ovs_assert(!n_conjs);
+            break;
+        }
+    }
+    if (n_conjs) {
+        int i = 0;
+
+        conjs = xzalloc(n_conjs * sizeof *conjs);
+        OFPACT_FOR_EACH (ofpact, fm->ofpacts, fm->ofpacts_len) {
+            if (ofpact->type == OFPACT_CONJUNCTION) {
+                struct ofpact_conjunction *oc = ofpact_get_CONJUNCTION(ofpact);
+                conjs[i].clause = oc->clause;
+                conjs[i].n_clauses = oc->n_clauses;
+                conjs[i].id = oc->id;
+                i++;
+            }
+        }
+    }
+
+    *conjsp = conjs;
+    *n_conjsp = n_conjs;
+}
+```
+
+
+## replace_rule_start
+
+```c
+static void replace_rule_start(struct ofproto *ofproto, cls_version_t version,
                    struct rule *old_rule, struct rule *new_rule,
                    struct cls_conjunction *conjs, size_t n_conjs)
 {
@@ -1621,7 +1653,7 @@ replace_rule_start(struct ofproto *ofproto, cls_version_t version,
     ofproto_rule_insert__(ofproto, new_rule);   //插入rule
     /* Make the new rule visible for classifier lookups only from the next
      * version. */
-    classifier_insert(&table->cls, &new_rule->cr, version, conjs, n_conjs);
+    classifier_insert(&table->cls, &new_rule->cr, version, conjs, n_conjs);  //插入到classifier中
 }
 ```
 
@@ -1629,8 +1661,7 @@ replace_rule_start(struct ofproto *ofproto, cls_version_t version,
 ### ofproto_rule_insert__
 
 ```c
-static void
-ofproto_rule_insert__(struct ofproto *ofproto, struct rule *rule)
+static void ofproto_rule_insert__(struct ofproto *ofproto, struct rule *rule)
     OVS_REQUIRES(ofproto_mutex)
 {
     const struct rule_actions *actions = rule_get_actions(rule);
@@ -1648,8 +1679,7 @@ ofproto_rule_insert__(struct ofproto *ofproto, struct rule *rule)
     rule->removed = false;
 }
 
-static void
-eviction_group_add_rule(struct rule *rule)
+static void eviction_group_add_rule(struct rule *rule)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct ofproto *ofproto = rule->ofproto;
@@ -1691,8 +1721,7 @@ eviction_group_find(struct oftable *table, uint32_t id)
     return evg;
 }
 
-static void
-meter_insert_rule(struct rule *rule)
+static void meter_insert_rule(struct rule *rule)
 {
     const struct rule_actions *a = rule_get_actions(rule);
     uint32_t meter_id = ofpacts_get_meter(a->ofpacts, a->ofpacts_len);  //根据action计算meter id
@@ -1706,8 +1735,7 @@ meter_insert_rule(struct rule *rule)
 ### classifier_insert
 
 ```c
-void
-classifier_insert(struct classifier *cls, const struct cls_rule *rule,
+void classifier_insert(struct classifier *cls, const struct cls_rule *rule,
                   cls_version_t version, const struct cls_conjunction conj[],
                   size_t n_conj)
 {
@@ -1716,8 +1744,7 @@ classifier_insert(struct classifier *cls, const struct cls_rule *rule,
     ovs_assert(!displaced_rule);
 }
 
-const struct cls_rule *
-classifier_replace(struct classifier *cls, const struct cls_rule *rule,
+const struct cls_rule * classifier_replace(struct classifier *cls, const struct cls_rule *rule,
                    cls_version_t version,
                    const struct cls_conjunction *conjs, size_t n_conjs)
 {
@@ -1732,11 +1759,11 @@ classifier_replace(struct classifier *cls, const struct cls_rule *rule,
     unsigned int i;
 
     /* 'new' is initially invisible to lookups. */
-    new = cls_match_alloc(rule, version, conjs, n_conjs);    //创建cls match
+    new = cls_match_alloc(rule, version, conjs, n_conjs);    //创建cls match，并初始化match的flow为rule->match.flow的内容
 
     CONST_CAST(struct cls_rule *, rule)->cls_match = new;    //建立rule 和match的关联关系
 
-    subtable = find_subtable(cls, rule->match.mask);         //找到mask相同的subtable
+    subtable = find_subtable(cls, rule->match.mask);         //找到mask相同的subtable，一种mask对应一个subtable
     if (!subtable) {
         subtable = insert_subtable(cls, rule->match.mask);   //创建subtable，添加到cls对象的map中
     }
@@ -1744,11 +1771,11 @@ classifier_replace(struct classifier *cls, const struct cls_rule *rule,
     /* Compute hashes in segments. */
     basis = 0;
     mask_offset = 0;
-    for (i = 0; i < subtable->n_indices; i++) {
+    for (i = 0; i < subtable->n_indices; i++) {       //n_indices为minimatch->mask匹配哪些字段，每一个需要匹配的字段都有一个indices
         ihash[i] = minimatch_hash_range(&rule->match, subtable->index_maps[i],
                                         &mask_offset, &basis);
     }
-    hash = minimatch_hash_range(&rule->match, subtable->index_maps[i],
+    hash = minimatch_hash_range(&rule->match, subtable->index_maps[i],     //根据match的flow和mask值来计算hash值
                                 &mask_offset, &basis);
 
     head = find_equal(subtable, rule->match.flow, hash);     //根据flow检索cls_match
@@ -1884,6 +1911,46 @@ classifier_replace(struct classifier *cls, const struct cls_rule *rule,
     }
 
     return NULL;
+}
+
+static struct cls_match * cls_match_alloc(const struct cls_rule *rule, cls_version_t version,
+                const struct cls_conjunction conj[], size_t n)
+{
+    size_t count = miniflow_n_values(rule->match.flow);
+
+    struct cls_match *cls_match
+        = xmalloc(sizeof *cls_match + MINIFLOW_VALUES_SIZE(count));
+
+    ovsrcu_init(&cls_match->next, NULL);
+    *CONST_CAST(const struct cls_rule **, &cls_match->cls_rule) = rule;    //设置match的cls_rule指针
+    *CONST_CAST(int *, &cls_match->priority) = rule->priority;             //设置match的优先级
+    *CONST_CAST(cls_version_t *, &cls_match->add_version) = version;       //设置match的add version
+    atomic_init(&cls_match->remove_version, version);   /* Initially
+                                                         * invisible. */
+    miniflow_clone(CONST_CAST(struct miniflow *, &cls_match->flow),       //克隆match的flow，拷贝自rule的match.flow值
+                   rule->match.flow, count);
+    ovsrcu_set_hidden(&cls_match->conj_set,
+                      cls_conjunction_set_alloc(cls_match, conj, n));
+
+    return cls_match;
+}
+
+static inline uint32_t
+minimatch_hash_range(const struct minimatch *match,
+                     const struct flowmap range, unsigned int *offset,
+                     uint32_t *basis)
+{
+    const uint64_t *p = miniflow_get_values(match->flow) + *offset;
+    const uint64_t *q = miniflow_get_values(&match->mask->masks) + *offset;
+    unsigned int n = flowmap_n_1bits(range);
+    uint32_t hash = *basis;
+
+    for (unsigned int i = 0; i < n; i++) {
+        hash = hash_add64(hash, p[i] & q[i]);
+    }
+    *basis = hash; /* Allow continuation from the unfinished value. */
+    *offset += n;
+    return hash_finish(hash, *offset * 8);
 }
 ```
 
