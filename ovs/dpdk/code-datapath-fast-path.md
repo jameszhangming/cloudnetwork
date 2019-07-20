@@ -6,6 +6,10 @@ DPDK OVS数据面在处理过程中，首先匹配cache表，如果cache表不�
 
 ![dp-fast-path-class](images/dp-fast-path-class.png "dp-fast-path-class")
 
+调用流程：
+
+![dp-fast-path](images/dp-fast-path.png "dp-fast-path")
+
 
 # fast_path_processing
 
@@ -114,7 +118,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
                 }
                 ovs_mutex_unlock(&pmd->flow_mutex);
 
-                emc_insert(flow_cache, &keys[i], netdev_flow);    //缓存中添加该流表
+                emc_insert(flow_cache, &keys[i], netdev_flow);    //upcall处理新增的流表，添加到缓存中
             }
         }
 
@@ -136,13 +140,13 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
         struct dp_packet *packet = packets[i];
         struct dp_netdev_flow *flow;
 
-        if (OVS_UNLIKELY(!rules[i])) {
+        if (OVS_UNLIKELY(!rules[i])) {    //upcall处理的报文对应rules为空
             continue;
         }
 
         flow = dp_netdev_flow_cast(rules[i]);     
 
-        emc_insert(flow_cache, &keys[i], flow);    //插入缓存
+        emc_insert(flow_cache, &keys[i], flow);    //直接查找流表匹配到流表，添加到缓存中
         dp_netdev_queue_batches(packet, flow, &keys[i].mf, batches, n_batches);   //报文添加到batches中
     }
 
@@ -229,7 +233,7 @@ dpcls_lookup(const struct dpcls *cls, const struct netdev_flow_key keys[],
     }
     memset(rules, 0, cnt * sizeof *rules);   //初始化rule指针，都设置为null
 
-    PVECTOR_FOR_EACH (subtable, &cls->subtables) {
+    PVECTOR_FOR_EACH (subtable, &cls->subtables) {    //遍历所有的dpcls_subtable
         const struct netdev_flow_key *mkeys = keys;
         struct dpcls_rule **mrules = rules;
         map_type remains = 0;
@@ -438,6 +442,358 @@ dpcls_rule_matches_key(const struct dpcls_rule *rule,
     return true;
 }
 ```
+
+
+## 流表查询总结
+
+dpcls检索步骤如下：
+
+1. 遍历所有的dpcls_subtable（ dp_netdev_pmd_thread ->cls. subtables ）；
+2. 使用packet生成的netdev_flow_key对象与dpcls_subtable的mask计算出hash值；
+3. 根据上一步骤的hash值得到一个链表，遍历该链表上的dpcls_rule对象，返回dpcls_rule匹配packet生成的netdev_flow_key对象；
+
+
+# dp_netdev_upcall
+
+```c
+static int dp_netdev_upcall(struct dp_netdev_pmd_thread *pmd, struct dp_packet *packet_,
+                 struct flow *flow, struct flow_wildcards *wc, ovs_u128 *ufid,
+                 enum dpif_upcall_type type, const struct nlattr *userdata,
+                 struct ofpbuf *actions, struct ofpbuf *put_actions)
+{
+    struct dp_netdev *dp = pmd->dp;   //得到datapath
+    struct flow_tnl orig_tunnel;
+    int err;
+
+    if (OVS_UNLIKELY(!dp->upcall_cb)) {
+        return ENODEV;
+    }
+
+    /* Upcall processing expects the Geneve options to be in the translated
+     * format but we need to retain the raw format for datapath use. */
+    orig_tunnel.flags = flow->tunnel.flags;     //保存tunnel信息
+    if (flow->tunnel.flags & FLOW_TNL_F_UDPIF) {
+        orig_tunnel.metadata.present.len = flow->tunnel.metadata.present.len;
+        memcpy(orig_tunnel.metadata.opts.gnv, flow->tunnel.metadata.opts.gnv,
+               flow->tunnel.metadata.present.len);
+        err = tun_metadata_from_geneve_udpif(&orig_tunnel, &orig_tunnel,
+                                             &flow->tunnel);
+        if (err) {
+            return err;
+        }
+    }
+
+    if (OVS_UNLIKELY(!VLOG_DROP_DBG(&upcall_rl))) {
+        struct ds ds = DS_EMPTY_INITIALIZER;
+        char *packet_str;
+        struct ofpbuf key;
+        struct odp_flow_key_parms odp_parms = {
+            .flow = flow,
+            .mask = &wc->masks,
+            .odp_in_port = flow->in_port.odp_port,
+            .support = dp_netdev_support,
+        };
+
+        ofpbuf_init(&key, 0);
+        odp_flow_key_from_flow(&odp_parms, &key);
+        packet_str = ofp_packet_to_string(dp_packet_data(packet_),
+                                          dp_packet_size(packet_));
+
+        odp_flow_key_format(key.data, key.size, &ds);
+
+        VLOG_DBG("%s: %s upcall:\n%s\n%s", dp->name,
+                 dpif_upcall_type_to_string(type), ds_cstr(&ds), packet_str);
+
+        ofpbuf_uninit(&key);
+        free(packet_str);
+
+        ds_destroy(&ds);
+    }
+
+	//实际调用upcall_cb函数，在udpif_create函数创建udpif时注册
+    err = dp->upcall_cb(packet_, flow, ufid, pmd->core_id, type, userdata,
+                        actions, wc, put_actions, dp->upcall_aux);   
+    if (err && err != ENOSPC) {
+        return err;
+    }
+
+    /* Translate tunnel metadata masks to datapath format. */
+    if (wc) {
+        if (wc->masks.tunnel.metadata.present.map) {
+            struct geneve_opt opts[TLV_TOT_OPT_SIZE /
+                                   sizeof(struct geneve_opt)];
+
+            if (orig_tunnel.flags & FLOW_TNL_F_UDPIF) {
+                tun_metadata_to_geneve_udpif_mask(&flow->tunnel,
+                                                  &wc->masks.tunnel,
+                                                  orig_tunnel.metadata.opts.gnv,
+                                                  orig_tunnel.metadata.present.len,
+                                                  opts);
+            } else {
+                orig_tunnel.metadata.present.len = 0;
+            }
+
+            memset(&wc->masks.tunnel.metadata, 0,
+                   sizeof wc->masks.tunnel.metadata);
+            memcpy(&wc->masks.tunnel.metadata.opts.gnv, opts,
+                   orig_tunnel.metadata.present.len);
+        }
+        wc->masks.tunnel.metadata.present.len = 0xff;
+    }
+
+    /* Restore tunnel metadata. We need to use the saved options to ensure
+     * that any unknown options are not lost. The generated mask will have
+     * the same structure, matching on types and lengths but wildcarding
+     * option data we don't care about. */
+    if (orig_tunnel.flags & FLOW_TNL_F_UDPIF) {
+        memcpy(&flow->tunnel.metadata.opts.gnv, orig_tunnel.metadata.opts.gnv,
+               orig_tunnel.metadata.present.len);
+        flow->tunnel.metadata.present.len = orig_tunnel.metadata.present.len;
+        flow->tunnel.flags |= FLOW_TNL_F_UDPIF;
+    }
+
+    return err;
+}
+```
+
+
+## upcall_cb
+
+```c
+static int
+upcall_cb(const struct dp_packet *packet, const struct flow *flow, ovs_u128 *ufid,
+          unsigned pmd_id, enum dpif_upcall_type type,
+          const struct nlattr *userdata, struct ofpbuf *actions,
+          struct flow_wildcards *wc, struct ofpbuf *put_actions, void *aux)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+    struct udpif *udpif = aux;
+    unsigned int flow_limit;
+    struct upcall upcall;
+    bool megaflow;
+    int error;
+
+    atomic_read_relaxed(&enable_megaflows, &megaflow);
+    atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
+
+    error = upcall_receive(&upcall, udpif->backer, packet, type, userdata,   
+                           flow, 0, ufid, pmd_id);  //初始化upcall对象
+    if (error) {
+        return error;
+    }
+
+    error = process_upcall(udpif, &upcall, actions, wc);   // upcall处理
+    if (error) {
+        goto out;
+    }
+
+    if (upcall.xout.slow && put_actions) {     //添加special flow actions
+        ofpbuf_put(put_actions, upcall.put_actions.data,
+                   upcall.put_actions.size);
+    }
+
+    if (OVS_UNLIKELY(!megaflow)) {
+        flow_wildcards_init_for_packet(wc, flow);    //初始化flow_wildcards
+    }
+
+    if (udpif_get_n_flows(udpif) >= flow_limit) {
+        VLOG_WARN_RL(&rl, "upcall_cb failure: datapath flow limit reached");
+        error = ENOSPC;
+        goto out;
+    }
+
+    /* Prevent miss flow installation if the key has recirculation ID but we
+     * were not able to get a reference on it. */
+    if (type == DPIF_UC_MISS && upcall.recirc && !upcall.have_recirc_ref) {
+        VLOG_WARN_RL(&rl, "upcall_cb failure: no reference for recirc flow");
+        error = ENOSPC;
+        goto out;
+    }
+
+    if (upcall.ukey && !ukey_install(udpif, upcall.ukey)) {    //安装ukey
+        VLOG_WARN_RL(&rl, "upcall_cb failure: ukey installation fails");
+        error = ENOSPC;
+    }
+out:
+    if (!error) {
+        upcall.ukey_persists = true;
+    }
+    upcall_uninit(&upcall);
+    return error;
+}
+```
+
+
+# dp_netdev_flow_add
+
+Upcall调用完成后，添加流表到datapath
+
+```c
+static struct dp_netdev_flow *
+dp_netdev_flow_add(struct dp_netdev_pmd_thread *pmd,
+                   struct match *match, const ovs_u128 *ufid,
+                   const struct nlattr *actions, size_t actions_len)
+    OVS_REQUIRES(pmd->flow_mutex)
+{
+    struct dp_netdev_flow *flow;
+    struct netdev_flow_key mask;
+
+	//该mask值对应openflow流表中设置的参数值
+	//如果该参数未定义，说明该不匹配该字段，那么mask该值为0
+	//如果该参数定义了，说明需要匹配该字段，那么mask等于match的mask值
+    netdev_flow_mask_init(&mask, match);    //初始化mask key
+    /* Make sure wc does not have metadata. */
+    ovs_assert(!FLOWMAP_HAS_FIELD(&mask.mf.map, metadata)
+               && !FLOWMAP_HAS_FIELD(&mask.mf.map, regs));
+
+    /* Do not allocate extra space. */
+    flow = xmalloc(sizeof *flow - sizeof flow->cr.flow.mf + mask.len);
+    memset(&flow->stats, 0, sizeof flow->stats);
+    flow->dead = false;
+    flow->batch = NULL;
+    *CONST_CAST(unsigned *, &flow->pmd_id) = pmd->core_id;
+    *CONST_CAST(struct flow *, &flow->flow) = match->flow;   //复制match的flow值
+    *CONST_CAST(ovs_u128 *, &flow->ufid) = *ufid;     //复制ufid值
+    ovs_refcount_init(&flow->ref_cnt);
+    ovsrcu_set(&flow->actions, dp_netdev_actions_create(actions, actions_len));
+
+    netdev_flow_key_init_masked(&flow->cr.flow, &match->flow, &mask);  //初始化flow->cr.flow的值和hash成员
+    dpcls_insert(&pmd->cls, &flow->cr, &mask);    //添加流表，用于流表检索
+
+    cmap_insert(&pmd->flow_table, CONST_CAST(struct cmap_node *, &flow->node),    //添加流表，用于管理
+                dp_netdev_flow_hash(&flow->ufid));
+
+    if (OVS_UNLIKELY(VLOG_IS_DBG_ENABLED())) {
+        struct match match;
+        struct ds ds = DS_EMPTY_INITIALIZER;
+
+        match.tun_md.valid = false;
+        match.flow = flow->flow;
+        miniflow_expand(&flow->cr.mask->mf, &match.wc.masks);
+
+        ds_put_cstr(&ds, "flow_add: ");
+        odp_format_ufid(ufid, &ds);
+        ds_put_cstr(&ds, " ");
+        match_format(&match, &ds, OFP_DEFAULT_PRIORITY);
+        ds_put_cstr(&ds, ", actions:");
+        format_odp_actions(&ds, actions, actions_len);
+
+        VLOG_DBG_RL(&upcall_rl, "%s", ds_cstr(&ds));
+
+        ds_destroy(&ds);
+    }
+
+    return flow;
+}
+```
+
+
+## netdev_flow_mask_init
+
+```c
+static inline void netdev_flow_mask_init(struct netdev_flow_key *mask,
+                      const struct match *match)
+{
+    uint64_t *dst = miniflow_values(&mask->mf);
+    struct flowmap fmap;
+    uint32_t hash = 0;
+    size_t idx;
+
+    /* Only check masks that make sense for the flow. */
+    flow_wc_map(&match->flow, &fmap);
+    flowmap_init(&mask->mf.map);
+
+    FLOWMAP_FOR_EACH_INDEX(idx, fmap) {
+        uint64_t mask_u64 = flow_u64_value(&match->wc.masks, idx);
+
+        if (mask_u64) {
+            flowmap_set(&mask->mf.map, idx, 1);
+            *dst++ = mask_u64;
+            hash = hash_add64(hash, mask_u64);
+        }
+    }
+
+    map_t map;
+
+    FLOWMAP_FOR_EACH_MAP (map, mask->mf.map) {
+        hash = hash_add64(hash, map);
+    }
+
+    size_t n = dst - miniflow_get_values(&mask->mf);
+
+    mask->hash = hash_finish(hash, n * 8);
+    mask->len = netdev_flow_key_size(n);
+}
+```
+
+
+## dp_netdev_actions_create
+
+```c
+struct dp_netdev_actions *
+dp_netdev_actions_create(const struct nlattr *actions, size_t size)
+{
+    struct dp_netdev_actions *netdev_actions;
+
+    netdev_actions = xmalloc(sizeof *netdev_actions + size);
+    memcpy(netdev_actions->actions, actions, size);
+    netdev_actions->size = size;
+
+    return netdev_actions;
+}
+```
+
+
+## netdev_flow_key_init_masked
+
+```c
+static inline void
+netdev_flow_key_init_masked(struct netdev_flow_key *dst,
+                            const struct flow *flow,
+                            const struct netdev_flow_key *mask)
+{
+    uint64_t *dst_u64 = miniflow_values(&dst->mf);
+    const uint64_t *mask_u64 = miniflow_get_values(&mask->mf);
+    uint32_t hash = 0;
+    uint64_t value;
+
+    dst->len = mask->len;
+    dst->mf = mask->mf;   /* Copy maps. */
+
+    FLOW_FOR_EACH_IN_MAPS(value, flow, mask->mf.map) {
+        *dst_u64 = value & *mask_u64++;
+        hash = hash_add64(hash, *dst_u64++);
+    }
+    dst->hash = hash_finish(hash,
+                            (dst_u64 - miniflow_get_values(&dst->mf)) * 8);
+}
+```
+
+
+## dpcls_insert
+
+```c
+static void dpcls_insert(struct dpcls *cls, struct dpcls_rule *rule,
+             const struct netdev_flow_key *mask)
+{
+    struct dpcls_subtable *subtable = dpcls_find_subtable(cls, mask);  //根据mask找到subtable
+
+    rule->mask = &subtable->mask;   //每个subtable都对应一个mask
+    cmap_insert(&subtable->rules, &rule->cmap_node, rule->flow.hash);
+}
+```
+
+
+## 添加流表总结
+
+当执行upcall时需要向数据面添加流表（非cache），相关数据结构的构造方法如下：
+
+1. dpcls_subtable对应一个netdev_flow_key对象，该对象作为mask，即相同的mask在同一个dpcls_subtable中，思路和内核OVS类似；
+2. dpcls_rule的mask指向dpcls_subtable的mask；
+3. dpcls_rule的flow的值根据match（upcall返回）的flow值与match的wc计算；
+4. dp_netdev_flow的flow从match的flow复制得到；
+5. dpcls_rule插入到dpcls_subtable中， 以dpcls_rule->flow.hash值作为index；
+6. dp_netdev_flow插入到pmd->flow_table中，以dp_netdev_flow->ufid的值计算出hash作为index；
 
 
 # emc_insert

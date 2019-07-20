@@ -294,7 +294,8 @@ static inline size_t emc_processing(struct dp_netdev_pmd_thread *pmd, struct dp_
                                     n_batches);
         } else {
             if (i != notfound_cnt) {
-                dp_packet_swap(&packets[i], &packets[notfound_cnt]);   //交换packet在数组中位置，其结果就是最前端的都是没有匹配到流表的
+			    //交换packet在数组中位置，其结果就是最前端的都是没有匹配到流表的
+                dp_packet_swap(&packets[i], &packets[notfound_cnt]);   
             }
 
             keys[notfound_cnt++] = key;           //设置未匹配到流表的报文的key值
@@ -766,9 +767,13 @@ uint32_t miniflow_hash_5tuple(const struct miniflow *flow, uint32_t basis)
 
 ### emc_lookup
 
-cache最大支持8k条流表，对于每个key hash值，可以计算出两个emc_entry，对比这两个cache_entry，如果匹配则返回entry对应的flow。
-1、cache中的entry添加时，会携带报文的key信息
-2、使用报文生成的key来判断是否一致，对于相同流的报文，entry中的key和当前报文生成的key肯定是相同的。
+cache检索步骤如下：
+
+1. 根据packet生成netdev_flow_key对象；
+2. 使用netdev_flow_key对象的hash值检索emc_cache；
+3. 每个netdev_flow_key对象的hash对应两个位置；
+   3.1 比较emc_entry的key和packet生成的netdev_flow_key是否一致；
+4. cache流表总大小为8K；
 
 ```c
 static inline struct dp_netdev_flow *
