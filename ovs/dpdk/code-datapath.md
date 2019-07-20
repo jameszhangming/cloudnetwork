@@ -6,6 +6,11 @@
 
 ![dp-flow-class](images/dp-flow-class.png "dp-flow-class")
 
+调用流程：
+
+![dp-progress](images/dp-progress.png "dp-progress")
+
+
 
 # 转发线程
 
@@ -24,7 +29,7 @@ static void * pmd_thread_main(void *f_)
 
     /* Stores the pmd thread's 'pmd' to 'per_pmd_key'. */
     ovsthread_setspecific(pmd->dp->per_pmd_key, pmd);
-    pmd_thread_setaffinity_cpu(pmd->core_id);              //当前线程绑定到指定core
+    pmd_thread_setaffinity_cpu(pmd->core_id);       //当前线程绑定到指定core
 reload:
     emc_cache_init(&pmd->flow_cache);     //初始化flow cache
 
@@ -152,7 +157,7 @@ static void dp_netdev_process_rxq_port(struct dp_netdev_pmd_thread *pmd,
         *recirc_depth_get() = 0;
 
         cycles_count_start(pmd);
-        dp_netdev_input(pmd, packets, cnt, port->port_no);
+        dp_netdev_input(pmd, packets, cnt, port->port_no);   //处理接收到的报文
         cycles_count_end(pmd, PMD_CYCLES_PROCESSING);
     } else if (error != EAGAIN && error != EOPNOTSUPP) {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
@@ -161,12 +166,7 @@ static void dp_netdev_process_rxq_port(struct dp_netdev_pmd_thread *pmd,
                     netdev_get_name(port->netdev), ovs_strerror(error));
     }
 }
-```
 
-
-### netdev_rxq_recv
-
-```
 int netdev_rxq_recv(struct netdev_rxq *rx, struct dp_packet **buffers, int *cnt)
 {
     int retval;
@@ -180,101 +180,38 @@ int netdev_rxq_recv(struct netdev_rxq *rx, struct dp_packet **buffers, int *cnt)
 ```
 
 
-### dpdk_class
-
-DPDK eth设备队列收包方法
-
-```c
-static int
-netdev_dpdk_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **packets,
-                     int *c)
-{
-    struct netdev_rxq_dpdk *rx = netdev_rxq_dpdk_cast(rxq_);
-    struct netdev *netdev = rx->up.netdev;
-    struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
-    int nb_rx;
-
-    /* There is only one tx queue for this core.  Do not flush other
-     * queues.
-     * Do not flush tx queue which is shared among CPUs
-     * since it is always flushed */
-    if (rxq_->queue_id == rte_lcore_id() &&
-        OVS_LIKELY(!dev->txq_needs_locking)) {
-        dpdk_queue_flush(dev, rxq_->queue_id);
-    }
-
-    nb_rx = rte_eth_rx_burst(rx->port_id, rxq_->queue_id,
-                             (struct rte_mbuf **) packets,
-                             NETDEV_MAX_BURST);
-    if (!nb_rx) {
-        return EAGAIN;
-    }
-
-    *c = nb_rx;
-
-    return 0;
-}
-```
-
-
-### dpdk_vhost_user_class
-
-```c
-static int
-netdev_dpdk_vhost_rxq_recv(struct netdev_rxq *rxq_,
-                           struct dp_packet **packets, int *c)
-{
-    struct netdev_rxq_dpdk *rx = netdev_rxq_dpdk_cast(rxq_);
-    struct netdev *netdev = rx->up.netdev;
-    struct netdev_dpdk *vhost_dev = netdev_dpdk_cast(netdev);
-    struct virtio_net *virtio_dev = netdev_dpdk_get_virtio(vhost_dev);
-    int qid = rxq_->queue_id;
-    uint16_t nb_rx = 0;
-
-    if (OVS_UNLIKELY(!is_vhost_running(virtio_dev))) {
-        return EAGAIN;
-    }
-
-    if (rxq_->queue_id >= vhost_dev->real_n_rxq) {
-        return EOPNOTSUPP;
-    }
-
-    nb_rx = rte_vhost_dequeue_burst(virtio_dev, qid * VIRTIO_QNUM + VIRTIO_TXQ,
-                                    vhost_dev->dpdk_mp->mp,
-                                    (struct rte_mbuf **)packets,
-                                    NETDEV_MAX_BURST);
-    if (!nb_rx) {
-        return EAGAIN;
-    }
-
-    rte_spinlock_lock(&vhost_dev->stats_lock);
-    netdev_dpdk_vhost_update_rx_counters(&vhost_dev->stats, packets, nb_rx);
-    rte_spinlock_unlock(&vhost_dev->stats_lock);
-
-    *c = (int) nb_rx;
-    return 0;
-}
-```
-
-
 ## emc_cache_slow_sweep
 
 ```c
 static void emc_cache_slow_sweep(struct emc_cache *flow_cache)
 {
-    struct emc_entry *entry = &flow_cache->entries[flow_cache->sweep_idx];   //从0开始往后组个替换
+	//从0开始往后组个清理，当前线程完成1024次收包（所有端口），做一次entry清理
+    struct emc_entry *entry = &flow_cache->entries[flow_cache->sweep_idx];   
 
     if (!emc_entry_alive(entry)) {   //如果该entry不再被使用，则清空该entry
         emc_clear_entry(entry);
     }
     flow_cache->sweep_idx = (flow_cache->sweep_idx + 1) & EM_FLOW_HASH_MASK;
 }
+
+static inline bool emc_entry_alive(struct emc_entry *ce)
+{
+    return ce->flow && !ce->flow->dead;
+}
+
+static void emc_clear_entry(struct emc_entry *ce)
+{
+    if (ce->flow) {
+        dp_netdev_flow_unref(ce->flow);
+        ce->flow = NULL;
+    }
+}
 ```
 
 
 # dp_netdev_input
 
-OVS收包处理
+DPDK OVS从接收队列收到批量报文后，做批量报文处理
 
 ```c
 static void dp_netdev_input(struct dp_netdev_pmd_thread *pmd,
@@ -829,6 +766,10 @@ uint32_t miniflow_hash_5tuple(const struct miniflow *flow, uint32_t basis)
 
 ### emc_lookup
 
+cache最大支持8k条流表，对于每个key hash值，可以计算出两个emc_entry，对比这两个cache_entry，如果匹配则返回entry对应的flow。
+1、cache中的entry添加时，会携带报文的key信息
+2、使用报文生成的key来判断是否一致，对于相同流的报文，entry中的key和当前报文生成的key肯定是相同的。
+
 ```c
 static inline struct dp_netdev_flow *
 emc_lookup(struct emc_cache *cache, const struct netdev_flow_key *key)
@@ -838,7 +779,7 @@ emc_lookup(struct emc_cache *cache, const struct netdev_flow_key *key)
     EMC_FOR_EACH_POS_WITH_HASH(cache, current_entry, key->hash) {    //遍历所有的emc_entry
         if (current_entry->key.hash == key->hash         //hash值匹配
             && emc_entry_alive(current_entry)            //entry当前处于活动状态
-            && netdev_flow_key_equal_mf(&current_entry->key, &key->mf)) {    //
+            && netdev_flow_key_equal_mf(&current_entry->key, &key->mf)) {    //使用报文的key来匹配
 
             /* We found the entry with the 'key->mf' miniflow */
             return current_entry->flow;
