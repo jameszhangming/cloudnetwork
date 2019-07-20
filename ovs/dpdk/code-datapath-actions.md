@@ -2,6 +2,10 @@
 
 本文介绍DPDK OVS完成流表匹配后，执行actions的流程。
 
+调用流程：
+
+![dp-actions](images/dp-actions.png "dp-actions")
+
 
 # dp_netdev_execute_actions
 
