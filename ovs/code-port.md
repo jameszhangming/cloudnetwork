@@ -1,17 +1,22 @@
-# bridge port操作
+# Port操作
 
-port操作的总入口是bridge_reconfigure函数， 调用流程如下：
+Port操作的总入口是bridge_reconfigure函数， 整体调用流程如下：
 
-1. bridge_del_ports 删除端口
-2. bridge_delete_or_reconfigure_ports 删除重置端口
-3. bridge_add_ports 添加端口
-4. port_configure 配置端口
+![port-config-flow](images/port-config-flow.png "port-config-flow")
 
-# bridge_del_ports(删除端口)
+Port操作的调用流程如下：
 
-```
-static void
-bridge_del_ports(struct bridge *br, const struct shash *wanted_ports)
+![port-config-flow2](images/port-config-flow2.png "port-config-flow2")
+
+Port数据结构：
+
+![bridge-class](images/bridge-class.png "bridge-class")
+
+
+# bridge_del_ports
+
+```C
+static void bridge_del_ports(struct bridge *br, const struct shash *wanted_ports)
 {
     struct shash_node *port_node;
     struct port *port, *next;
@@ -21,9 +26,9 @@ bridge_del_ports(struct bridge *br, const struct shash *wanted_ports)
     HMAP_FOR_EACH_SAFE (port, next, hmap_node, &br->ports) {
         port->cfg = shash_find_data(wanted_ports, port->name);
         if (!port->cfg) {
-            port_destroy(port);
+            port_destroy(port);       //port已经被删除，则删除该port
         } else {
-            port_del_ifaces(port);     //删除所有ifaces
+            port_del_ifaces(port);    //清除不需要的ifaces
         }
     }
 
@@ -51,56 +56,44 @@ bridge_del_ports(struct bridge *br, const struct shash *wanted_ports)
         }
     }
 }
+```
 
-static void
-port_del_ifaces(struct port *port)
+
+## port_destroy
+
+```c
+static void port_destroy(struct port *port)
 {
-    struct iface *iface, *next;
-    struct sset new_ifaces;
-    size_t i;
+    if (port) {
+        struct bridge *br = port->bridge;
+        struct iface *iface, *next;
 
-    /* Collect list of new interfaces. */
-    sset_init(&new_ifaces);
-    for (i = 0; i < port->cfg->n_interfaces; i++) {
-        const char *name = port->cfg->interfaces[i]->name;
-        const char *type = port->cfg->interfaces[i]->type;
-        if (strcmp(type, "null")) {
-            sset_add(&new_ifaces, name);
+        if (br->ofproto) {
+            ofproto_bundle_unregister(br->ofproto, port);  //清除ofport bundle
         }
-    }
 
-    /* Get rid of deleted interfaces. */
-    LIST_FOR_EACH_SAFE (iface, next, port_elem, &port->ifaces) {
-        if (!sset_contains(&new_ifaces, iface->name)) {
-            iface_destroy(iface);   //销毁iface对象
+        LIST_FOR_EACH_SAFE (iface, next, port_elem, &port->ifaces) {
+            iface_destroy__(iface);   //销毁port的所有iface
         }
-    }
 
-    sset_destroy(&new_ifaces);
-}
-
-static void
-iface_destroy(struct iface *iface)
-{
-    if (iface) {
-        struct port *port = iface->port;
-
-        iface_destroy__(iface);
-        if (list_is_empty(&port->ifaces)) {
-            port_destroy(port);
-        }
+        hmap_remove(&br->ports, &port->hmap_node);
+        free(port->name);
+        free(port);
     }
 }
+```
 
-static void
-iface_destroy__(struct iface *iface)
+### iface_destroy__
+
+```c
+static void iface_destroy__(struct iface *iface)
 {
     if (iface) {
         struct port *port = iface->port;
         struct bridge *br = port->bridge;
 
         if (br->ofproto && iface->ofp_port != OFPP_NONE) {
-            ofproto_port_unregister(br->ofproto, iface->ofp_port);  //删除of端口
+            ofproto_port_unregister(br->ofproto, iface->ofp_port);
         }
 
         if (iface->ofp_port != OFPP_NONE) {
@@ -112,36 +105,14 @@ iface_destroy__(struct iface *iface)
 
         /* The user is changing configuration here, so netdev_remove needs to be
          * used as opposed to netdev_close */
-        netdev_remove(iface->netdev);   //删除netdev设备
+        netdev_remove(iface->netdev);   //从全局netdev设备中，删除netdev
 
         free(iface->name);
         free(iface);
     }
 }
 
-static void
-port_destroy(struct port *port)
-{
-    if (port) {
-        struct bridge *br = port->bridge;
-        struct iface *iface, *next;
-
-        if (br->ofproto) {
-            ofproto_bundle_unregister(br->ofproto, port);   //bundle删除
-        }
-
-        LIST_FOR_EACH_SAFE (iface, next, port_elem, &port->ifaces) {
-            iface_destroy__(iface);
-        }
-
-        hmap_remove(&br->ports, &port->hmap_node);
-        free(port->name);
-        free(port);
-    }
-}
-
-void
-ofproto_port_unregister(struct ofproto *ofproto, ofp_port_t ofp_port)
+void ofproto_port_unregister(struct ofproto *ofproto, ofp_port_t ofp_port)
 {
     struct ofport *port = ofproto_get_port(ofproto, ofp_port);
     if (port) {
@@ -163,28 +134,7 @@ ofproto_port_unregister(struct ofproto *ofproto, ofp_port_t ofp_port)
     }
 }
 
-int
-ofproto_bundle_unregister(struct ofproto *ofproto, void *aux)
-{
-    return ofproto_bundle_register(ofproto, aux, NULL);
-}
-
-int
-ofproto_bundle_register(struct ofproto *ofproto, void *aux,
-                        const struct ofproto_bundle_settings *s)
-{
-    return (ofproto->ofproto_class->bundle_set
-            ? ofproto->ofproto_class->bundle_set(ofproto, aux, s)
-            : EOPNOTSUPP);
-}
-```
-
-
-## netdev_remove
-
-```
-void
-netdev_remove(struct netdev *netdev)
+void netdev_remove(struct netdev *netdev)
 {
     if (netdev) {
         ovs_mutex_lock(&netdev_mutex);
@@ -197,8 +147,7 @@ netdev_remove(struct netdev *netdev)
     }
 }
 
-static void
-netdev_unref(struct netdev *dev)
+static void netdev_unref(struct netdev *dev)
     OVS_RELEASES(netdev_mutex)
 {
     ovs_assert(dev->ref_cnt);
@@ -206,13 +155,13 @@ netdev_unref(struct netdev *dev)
         const struct netdev_class *class = dev->netdev_class;
         struct netdev_registered_class *rc;
 
-        dev->netdev_class->destruct(dev);
+        dev->netdev_class->destruct(dev);    //取消配置
 
         if (dev->node) {
             shash_delete(&netdev_shash, dev->node);
         }
         free(dev->name);
-        dev->netdev_class->dealloc(dev);
+        dev->netdev_class->dealloc(dev);    //释放
         ovs_mutex_unlock(&netdev_mutex);
 
         ovs_mutex_lock(&netdev_class_mutex);
@@ -227,11 +176,57 @@ netdev_unref(struct netdev *dev)
 ```
 
 
+## port_del_ifaces
+
+```c
+static void port_del_ifaces(struct port *port)
+{
+    struct iface *iface, *next;
+    struct sset new_ifaces;
+    size_t i;
+
+    /* Collect list of new interfaces. */
+    sset_init(&new_ifaces);
+    for (i = 0; i < port->cfg->n_interfaces; i++) {
+        const char *name = port->cfg->interfaces[i]->name;
+        const char *type = port->cfg->interfaces[i]->type;
+        if (strcmp(type, "null")) {
+            sset_add(&new_ifaces, name);   //新的ifaces
+        }
+    }
+
+    /* Get rid of deleted interfaces. */
+    LIST_FOR_EACH_SAFE (iface, next, port_elem, &port->ifaces) {  //遍历所有的ifaces
+        if (!sset_contains(&new_ifaces, iface->name)) {  //ifaces不在新的ifaces中则删除iface
+            iface_destroy(iface);
+        }
+    }
+
+    sset_destroy(&new_ifaces);
+}
+```
+
+### iface_destroy
+
+```c
+static void iface_destroy(struct iface *iface)
+{
+    if (iface) {
+        struct port *port = iface->port;
+
+        iface_destroy__(iface);
+        if (list_is_empty(&port->ifaces)) {
+            port_destroy(port);
+        }
+    }
+}
+```
+
+
 # bridge_delete_or_reconfigure_ports
 
 ```c
-static void
-bridge_delete_or_reconfigure_ports(struct bridge *br)
+static void bridge_delete_or_reconfigure_ports(struct bridge *br)
 {
     struct ofproto_port ofproto_port;
     struct ofproto_port_dump dump;
@@ -257,14 +252,14 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
      * Side tasks: Reconfigure the ports that are still in 'br'.  Delete ports
      * that have the wrong OpenFlow port number (and arrange to add them back
      * with the correct OpenFlow port number). */
-    OFPROTO_PORT_FOR_EACH (&ofproto_port, &dump, br->ofproto) {
+    OFPROTO_PORT_FOR_EACH (&ofproto_port, &dump, br->ofproto) {    //遍历openflow端口
         ofp_port_t requested_ofp_port;
         struct iface *iface;
 
         sset_add(&ofproto_ports, ofproto_port.name);
 
-        iface = iface_lookup(br, ofproto_port.name);
-        if (!iface) {
+        iface = iface_lookup(br, ofproto_port.name);   //根据端口名查找iface
+        if (!iface) {     //如果iface不存在，则删除该openflow端口
             /* No such iface is configured, so we should delete this
              * ofproto_port.
              *
@@ -277,7 +272,8 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
             goto delete;
         }
 
-        if (strcmp(ofproto_port.type, iface->type)
+		//端口类型不匹配或者更新netdev属性失败，删除该端口和iface
+        if (strcmp(ofproto_port.type, iface->type)    
             || netdev_set_config(iface->netdev, &iface->cfg->options, NULL)) {
             /* The interface is the wrong type or can't be configured.
              * Delete it. */
@@ -288,19 +284,19 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
          * already the correct port, then we might want to temporarily delete
          * this interface, so we can add it back again with the new OpenFlow
          * port number. */
-        requested_ofp_port = iface_get_requested_ofp_port(iface->cfg);
+        requested_ofp_port = iface_get_requested_ofp_port(iface->cfg);  //得到配置的openflow端口号
         if (iface->ofp_port != OFPP_LOCAL &&
             requested_ofp_port != OFPP_NONE &&
-            requested_ofp_port != iface->ofp_port) {
+            requested_ofp_port != iface->ofp_port) {  //端口和当前iface的端口不一致
             ofp_port_t victim_request;
             struct iface *victim;
 
             /* Check for an existing OpenFlow port currently occupying
              * 'iface''s requested port number.  If there isn't one, then
              * delete this port.  Otherwise we need to consider further. */
-            victim = iface_from_ofp_port(br, requested_ofp_port);
+            victim = iface_from_ofp_port(br, requested_ofp_port);  //根据请求的openflow端口号查询iface
             if (!victim) {
-                goto delete;
+                goto delete;   //根据请求的openflow端口号未查询到iface，则删除当前iface
             }
 
             /* 'victim' is a port currently using 'iface''s requested port
@@ -313,11 +309,11 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
              * like 'iface', then that's a configuration inconsistency that we
              * can't resolve.  We might as well let it keep its current port
              * number. */
-            victim_request = iface_get_requested_ofp_port(victim->cfg);
-            if (victim_request != requested_ofp_port) {
+            victim_request = iface_get_requested_ofp_port(victim->cfg);  
+            if (victim_request != requested_ofp_port) {  //如果victim的配置不一致，则删除victim
                 del = add_ofp_port(victim->ofp_port, del, &n, &allocated);
                 iface_destroy(victim);
-                goto delete;
+                goto delete;      //同时也需要删除iface
             }
         }
 
@@ -325,11 +321,11 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
         continue;
 
     delete:
-        iface_destroy(iface);
-        del = add_ofp_port(ofproto_port.ofp_port, del, &n, &allocated);
+        iface_destroy(iface);   
+        del = add_ofp_port(ofproto_port.ofp_port, del, &n, &allocated);   //openflow端口添加到删除列表中
     }
     for (i = 0; i < n; i++) {
-        ofproto_port_del(br->ofproto, del[i]);    //of删除端口
+        ofproto_port_del(br->ofproto, del[i]);    //删除openflow端口
     }
     free(del);
 
@@ -348,13 +344,13 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
     HMAP_FOR_EACH_SAFE (port, port_next, hmap_node, &br->ports) {
         struct iface *iface, *iface_next;
 
-        LIST_FOR_EACH_SAFE (iface, iface_next, port_elem, &port->ifaces) {
-            if (!sset_contains(&ofproto_ports, iface->name)) {
+        LIST_FOR_EACH_SAFE (iface, iface_next, port_elem, &port->ifaces) {  //遍历iface
+            if (!sset_contains(&ofproto_ports, iface->name)) {   //如果openflow端口中没有该iface，则删除该iface
                 iface_destroy__(iface);
             }
         }
 
-        if (list_is_empty(&port->ifaces)) {
+        if (list_is_empty(&port->ifaces)) {  //如果端口没有iface，则删除该端口
             port_destroy(port);
         }
     }
@@ -363,18 +359,40 @@ bridge_delete_or_reconfigure_ports(struct bridge *br)
 ```
 
 
-# 删除port总结
+## ofproto_port_del
 
-del port调用流程：
+```c
+int ofproto_port_del(struct ofproto *ofproto, ofp_port_t ofp_port)
+{
+    struct ofport *ofport = ofproto_get_port(ofproto, ofp_port);
+    const char *name = ofport ? netdev_get_name(ofport->netdev) : "<unknown>";
+    struct simap_node *ofp_request_node;
+    int error;
 
-![port-del-flow](images/port-del-flow.png "port-del-flow")
+    ofp_request_node = simap_find(&ofproto->ofp_requests, name);
+    if (ofp_request_node) {
+        simap_delete(&ofproto->ofp_requests, ofp_request_node);
+    }
 
-
-# bridge_add_ports(添加端口)
-
+    error = ofproto->ofproto_class->port_del(ofproto, ofp_port);   //调用openflow 删除端口接口
+    if (!error && ofport) {
+        /* 'name' is the netdev's name and update_port() is going to close the
+         * netdev.  Just in case update_port() refers to 'name' after it
+         * destroys 'ofport', make a copy of it around the update_port()
+         * call. */
+        char *devname = xstrdup(name);
+        update_port(ofproto, devname);       //更新openflow交换机的端口
+        free(devname);
+    }
+    return error;
+}
 ```
-static void
-bridge_add_ports(struct bridge *br, const struct shash *wanted_ports)
+
+
+# bridge_add_ports
+
+```c
+static void bridge_add_ports(struct bridge *br, const struct shash *wanted_ports)
 {
     /* First add interfaces that request a particular port number. */
     bridge_add_ports__(br, wanted_ports, true);
@@ -404,15 +422,19 @@ bridge_add_ports__(struct bridge *br, const struct shash *wanted_ports,
                 struct iface *iface = iface_lookup(br, iface_cfg->name);
 
                 if (!iface) {
-                    iface_create(br, iface_cfg, port_cfg);    //创建iface
+                    iface_create(br, iface_cfg, port_cfg);    //iface未创建，则创建iface
                 }
             }
         }
     }
 }
+```
 
-static bool
-iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
+
+## iface_create
+
+```c
+static bool iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
              const struct ovsrec_port *port_cfg)
 {
     struct netdev *netdev;
@@ -424,7 +446,8 @@ iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
 
     /* Do the bits that can fail up front. */
     ovs_assert(!iface_lookup(br, iface_cfg->name));
-    error = iface_do_create(br, iface_cfg, port_cfg, &ofp_port, &netdev, &errp);
+	//创建netdev和openflow port
+    error = iface_do_create(br, iface_cfg, port_cfg, &ofp_port, &netdev, &errp);  
     if (error) {
         iface_clear_db_record(iface_cfg, errp);
         free(errp);
@@ -434,13 +457,13 @@ iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
     /* Get or create the port structure. */
     port = port_lookup(br, port_cfg->name);
     if (!port) {
-        port = port_create(br, port_cfg);
+        port = port_create(br, port_cfg);      //创建port
     }
 
     /* Create the iface structure. */
-    iface = xzalloc(sizeof *iface);
-    list_push_back(&port->ifaces, &iface->port_elem);
-    hmap_insert(&br->iface_by_name, &iface->name_node,
+    iface = xzalloc(sizeof *iface);           //创建iface
+    list_push_back(&port->ifaces, &iface->port_elem);    //iface添加到port的ifaces链表中
+    hmap_insert(&br->iface_by_name, &iface->name_node,   //iface添加到br的ifaces map中
                 hash_string(iface_cfg->name, 0));
     iface->port = port;
     iface->name = xstrdup(iface_cfg->name);
@@ -448,7 +471,7 @@ iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
     iface->netdev = netdev;
     iface->type = iface_get_type(iface_cfg, br->cfg);
     iface->cfg = iface_cfg;
-    hmap_insert(&br->ifaces, &iface->ofp_port_node,
+    hmap_insert(&br->ifaces, &iface->ofp_port_node,  //iface添加到br的ifaces map中
                 hash_ofp_port(ofp_port));
 
     /* Populate initial status in database. */
@@ -481,9 +504,32 @@ iface_create(struct bridge *br, const struct ovsrec_interface *iface_cfg,
 
     return true;
 }
+```
 
-static int
-iface_do_create(const struct bridge *br,
+
+### port_create
+
+```c
+static struct port * port_create(struct bridge *br, const struct ovsrec_port *cfg)
+{
+    struct port *port;
+
+    port = xzalloc(sizeof *port);
+    port->bridge = br;
+    port->name = xstrdup(cfg->name);
+    port->cfg = cfg;
+    list_init(&port->ifaces);
+
+    hmap_insert(&br->ports, &port->hmap_node, hash_string(port->name, 0));
+    return port;
+}
+```
+
+
+### iface_do_create
+
+```c
+static int iface_do_create(const struct bridge *br,
                 const struct ovsrec_interface *iface_cfg,
                 const struct ovsrec_port *port_cfg,
                 ofp_port_t *ofp_portp, struct netdev **netdevp,
@@ -533,24 +579,9 @@ error:
     netdev_close(netdev);
     return error;
 }
-
-static struct port *
-port_create(struct bridge *br, const struct ovsrec_port *cfg)
-{
-    struct port *port;
-
-    port = xzalloc(sizeof *port);
-    port->bridge = br;
-    port->name = xstrdup(cfg->name);
-    port->cfg = cfg;
-    list_init(&port->ifaces);
-
-    hmap_insert(&br->ports, &port->hmap_node, hash_string(port->name, 0));
-    return port;
-}
 ```
 
-## netdev_open
+### netdev_open
 
 ```
 int
@@ -570,7 +601,8 @@ netdev_open(const char *name, const char *type, struct netdev **netdevp)
 
         rc = netdev_lookup_class(type && type[0] ? type : "system");
         if (rc) {
-            netdev = rc->class->alloc();    //调用netdev_class的alloc方法，根据端口类型实际分配netdev_linux或netdev_dpdk对象
+		    //调用netdev_class的alloc方法，根据端口类型实际分配netdev_linux或netdev_dpdk对象
+            netdev = rc->class->alloc();    
             if (netdev) {
                 memset(netdev, 0, sizeof *netdev);
                 netdev->netdev_class = rc->class;
@@ -618,126 +650,6 @@ netdev_open(const char *name, const char *type, struct netdev **netdevp)
     return error;
 }
 ```
-
-
-## netdev_class列表
-
-```
-const struct netdev_class netdev_linux_class =
-    NETDEV_LINUX_CLASS(
-        "system",
-        netdev_linux_construct,
-        netdev_linux_get_stats,
-        netdev_linux_get_features,
-        netdev_linux_get_status);
-
-const struct netdev_class netdev_tap_class =
-    NETDEV_LINUX_CLASS(
-        "tap",
-        netdev_linux_construct_tap,
-        netdev_tap_get_stats,
-        netdev_linux_get_features,
-        netdev_linux_get_status);
-
-const struct netdev_class netdev_internal_class =
-    NETDEV_LINUX_CLASS(
-        "internal",
-        netdev_linux_construct,
-        netdev_internal_get_stats,
-        NULL,                  /* get_features */
-        netdev_internal_get_status);
-
-//DPDK
-static const struct netdev_class dpdk_class =
-    NETDEV_DPDK_CLASS(
-        "dpdk",
-        NULL,
-        netdev_dpdk_construct,
-        netdev_dpdk_destruct,
-        netdev_dpdk_set_multiq,
-        netdev_dpdk_eth_send,
-        netdev_dpdk_get_carrier,
-        netdev_dpdk_get_stats,
-        netdev_dpdk_get_features,
-        netdev_dpdk_get_status,
-        netdev_dpdk_rxq_recv);
-
-static const struct netdev_class dpdk_ring_class =
-    NETDEV_DPDK_CLASS(
-        "dpdkr",
-        NULL,
-        netdev_dpdk_ring_construct,
-        netdev_dpdk_destruct,
-        netdev_dpdk_set_multiq,
-        netdev_dpdk_ring_send,
-        netdev_dpdk_get_carrier,
-        netdev_dpdk_get_stats,
-        netdev_dpdk_get_features,
-        netdev_dpdk_get_status,
-        netdev_dpdk_rxq_recv);
-
-static const struct netdev_class OVS_UNUSED dpdk_vhost_cuse_class =
-    NETDEV_DPDK_CLASS(
-        "dpdkvhostcuse",
-        dpdk_vhost_cuse_class_init,
-        netdev_dpdk_vhost_cuse_construct,
-        netdev_dpdk_vhost_destruct,
-        netdev_dpdk_vhost_cuse_set_multiq,
-        netdev_dpdk_vhost_send,
-        netdev_dpdk_vhost_get_carrier,
-        netdev_dpdk_vhost_get_stats,
-        NULL,
-        NULL,
-        netdev_dpdk_vhost_rxq_recv);
-
-static const struct netdev_class OVS_UNUSED dpdk_vhost_user_class =
-    NETDEV_DPDK_CLASS(
-        "dpdkvhostuser",
-        dpdk_vhost_user_class_init,
-        netdev_dpdk_vhost_user_construct,
-        netdev_dpdk_vhost_destruct,
-        netdev_dpdk_vhost_set_multiq,
-        netdev_dpdk_vhost_send,
-        netdev_dpdk_vhost_get_carrier,
-        netdev_dpdk_vhost_get_stats,
-        NULL,
-        NULL,
-        netdev_dpdk_vhost_rxq_recv);
-
-//虚拟端口
-    static const struct vport_class vport_classes[] = {
-        TUNNEL_CLASS("geneve", "genev_sys", netdev_geneve_build_header,
-                                            push_udp_header,
-                                            netdev_geneve_pop_header),
-        TUNNEL_CLASS("gre", "gre_sys", netdev_gre_build_header,
-                                       netdev_gre_push_header,
-                                       netdev_gre_pop_header),
-        TUNNEL_CLASS("ipsec_gre", "gre_sys", NULL, NULL, NULL),
-        TUNNEL_CLASS("vxlan", "vxlan_sys", netdev_vxlan_build_header,
-                                           push_udp_header,
-                                           netdev_vxlan_pop_header),
-        TUNNEL_CLASS("lisp", "lisp_sys", NULL, NULL, NULL),
-        TUNNEL_CLASS("stt", "stt_sys", NULL, NULL, NULL),
-    };
-
-    static const struct vport_class patch_class =
-        { NULL,
-            { "patch", VPORT_FUNCTIONS(get_patch_config,
-                                       set_patch_config,
-                                       NULL,
-                                       NULL, NULL, NULL, NULL) }};	
-```
-
-
-## 添加port总结
-
-数据结构：
-
-![port-class](images/port-class.png "port-class")
-
-调用流程：
-
-![port-add-flow](images/port-add-flow.png "port-add-flow")
 
 
 # port_configure
