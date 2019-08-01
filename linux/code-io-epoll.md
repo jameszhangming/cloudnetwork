@@ -1,4 +1,4 @@
-# epoll
+# epoll简介
 
 epoll是一种I/O事件通知机制。
 
@@ -10,9 +10,11 @@ epoll工作模式:
   * 该模式是一种高速处理模式，当且仅当状态发生变化时才会获得通知。在该模式下，其假定开发者在接收到一次通知后，会完整地处理该事件，因此内核将不再通知这一事件。注意，缓冲区中还有未处理的数据不能说是状态变化，因此，在ET模式下，开发者如果只读取了一部分数据，其将再也得不到通知了。正确的做法是，开发者自己确认读完了所有的字节（一直调用read/write直到出错EAGAGIN为止）。
 
   
-## select/poll/epoll对比
+# select/poll/epoll对比
 
 * select
+  * 每次调用select都需要把fd_set集合从用户态拷贝到内核态
+  * 每次调用select都需要在内核遍历传递进来的所有fd_set
   * 支持多个socket
   * 使用bit位置来表示fd
   * 支持立即返回/超时/无限等待
@@ -28,8 +30,147 @@ epoll工作模式:
   * 支持立即返回/超时/无限等待
   * 进程唤醒时，知道是哪个fd，当fd数量多时性能比较好
 
+  
+# epoll示例代码
 
-## 数据结构
+```c
+#include <iostream>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#define MAXLINE 10
+#define OPEN_MAX 100
+#define LISTENQ 20
+#define SERV_PORT 5555
+#define INFTIM 1000
+
+void setnonblocking(int sock)
+{
+    int opts;
+    opts = fcntl(sock, F_GETFL);
+    if(opts < 0)
+    {
+        perror("fcntl(sock,GETFL)");
+        exit(1);
+    }
+    opts = opts | O_NONBLOCK;
+    if(fcntl(sock, F_SETFL, opts) < 0)
+    {
+        perror("fcntl(sock,SETFL,opts)");
+        exit(1);
+    }
+}
+
+int main()
+{
+    int i, maxi, listenfd, connfd, sockfd, epfd, nfds;
+    ssize_t n;
+    char line[MAXLINE];
+    socklen_t clilen;
+    //声明epoll_event结构体的变量,ev用于注册事件,数组用于回传要处理的事件
+    struct epoll_event ev, events[20];
+    //生成用于处理accept的epoll专用的文件描述符
+    epfd = epoll_create(256);
+
+    struct sockaddr_in clientaddr;
+    struct sockaddr_in serveraddr;
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    //把socket设置为非阻塞方式
+    setnonblocking(listenfd);
+    //设置与要处理的事件相关的文件描述符
+    ev.data.fd = listenfd;
+    //设置要处理的事件类型
+    ev.events = EPOLLIN | EPOLLET;
+    //注册epoll事件
+    epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
+
+    bzero(&serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+
+    char *local_addr = "200.200.200.204";
+    inet_aton(local_addr, &(serveraddr.sin_addr)); //htons(SERV_PORT);
+    serveraddr.sin_port = htons(SERV_PORT);
+    bind(listenfd, (sockaddr *)&serveraddr, sizeof(serveraddr));
+    listen(listenfd, LISTENQ);
+
+    maxi = 0;
+    for ( ; ; )
+    {
+        //等待epoll事件的发生
+        nfds = epoll_wait(epfd, events, 20, 500);
+        //处理所发生的所有事件
+        for(i = 0; i < nfds; ++i)   //nfds为已触发事件的fd数量
+        {
+            if(events[i].data.fd == listenfd)
+            {
+
+                connfd = accept(listenfd, (sockaddr *)&clientaddr, &clilen);
+                if(connfd < 0)
+                {
+                    perror("connfd<0");
+                    exit(1);
+                }
+                setnonblocking(connfd);
+
+                char *str = inet_ntoa(clientaddr.sin_addr);
+                std::cout << "connect from " < _u115 ? tr << std::endl;
+                //设置用于读操作的文件描述符
+                ev.data.fd = connfd;
+                //设置用于注测的读操作事件
+                ev.events = EPOLLIN | EPOLLET;
+                //注册ev
+                epoll_ctl(epfd, EPOLL_CTL_ADD, connfd, &ev);
+            }
+            else if(events[i].events & EPOLLIN)
+            {
+                if ( (sockfd = events[i].data.fd) < 0) continue;
+                if ( (n = read(sockfd, line, MAXLINE)) < 0)
+                {
+                    if (errno == ECONNRESET)
+                    {
+
+                        close(sockfd);
+                        events[i].data.fd = -1;
+                    }
+                    else
+                        std::cout << "readline error" << std::endl;
+                }
+                else if (n == 0)
+                {
+                    close(sockfd);
+                    events[i].data.fd = -1;
+                }
+                //设置用于写操作的文件描述符
+                ev.data.fd = sockfd;
+                //设置用于注测的写操作事件
+                ev.events = EPOLLOUT | EPOLLET;
+                //修改sockfd上要处理的事件为EPOLLOUT
+                epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, &ev);
+            }
+            else if(events[i].events & EPOLLOUT)
+            {
+                sockfd = events[i].data.fd;
+                write(sockfd, line, n);
+                //设置用于读操作的文件描述符
+                ev.data.fd = sockfd;
+                //设置用于注测的读操作事件
+                ev.events = EPOLLIN | EPOLLET;
+                //修改sockfd上要处理的事件为EPOLIN
+                epoll_ctl(epfd, EPOLL_CTL_MOD, sockfd, &ev);
+            }
+
+        }
+
+    }
+}
+```
+
+# epoll数据结构
 
 ![epoll-class](images/epoll-class.png "epoll-class")
 
@@ -45,7 +186,7 @@ static const struct file_operations eventpoll_fops = {
 ``` 
 
 
-## 模块初始化
+# epoll模块初始化
 
 ```c
 static int __init eventpoll_init(void)
@@ -91,7 +232,7 @@ static int __init eventpoll_init(void)
 ```
 
 
-## epoll_create
+# epoll_create
 
 ```c
 SYSCALL_DEFINE1(epoll_create, int, size)
@@ -147,7 +288,7 @@ out_free_ep:
 ```
 
 
-## epoll_ctl
+# epoll_ctl
 
 epoll的事件注册函数，它不同于select是在监听事件时告诉内核要监听什么类型的事件，而是通过epoll_ctl注册要监听的事件类型。
 
@@ -300,7 +441,7 @@ error_return:
 ```
 
 
-### ep_find
+## ep_find
 
 ```c
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
@@ -329,7 +470,7 @@ static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
 ```
 
 
-### ep_insert
+## ep_insert
 
 ```c
 static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
@@ -459,7 +600,7 @@ error_create_wakeup_source:
 }
 ```
 
-### ep_ptable_queue_proc
+## ep_ptable_queue_proc
 
 ```c
 static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
@@ -482,7 +623,7 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
 }
 ```
 
-### ep_poll_callback
+## ep_poll_callback
 
 fd唤醒等待队列时，会调用此函数，该函数是在调用epoll_ctl函数时注册的。
 
@@ -574,7 +715,7 @@ out_unlock:
 ```
 
 
-## epoll_wait
+# epoll_wait
 
 ```c
 SYSCALL_DEFINE4(epoll_wait, int, epfd, struct epoll_event __user *, events,
@@ -701,7 +842,7 @@ check_events:
 ```
 
 
-### ep_send_events
+## ep_send_events
 
 ```c
 static int ep_send_events(struct eventpoll *ep,
@@ -808,7 +949,7 @@ static int ep_scan_ready_list(struct eventpoll *ep,
 ```
 
 
-### ep_send_events_proc
+## ep_send_events_proc
 
 ```c
 static int ep_send_events_proc(struct eventpoll *ep, struct list_head *head,
