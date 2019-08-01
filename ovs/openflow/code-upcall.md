@@ -2,8 +2,12 @@
 
 内核OVS数据面出现流表不能匹配时，会upcall到OVSD进行流表匹配，匹配成功后将下发流表到数据面。
 
+upcall整体流程：
 
-# 数据面
+![upcall-flow](images/upcall-flow.png "upcall-flow")
+
+
+# ovs_dp_process_packet（数据面）
 
 数据面在ovs_dp_process_packet处理函数中，如果当前报文未在流表中匹配到时，会调用ovs_dp_upcall发送upcall请求。
 
@@ -53,7 +57,33 @@ out:
 	stats->n_mask_hit += n_mask_hit;
 	u64_stats_update_end(&stats->syncp);
 }
+```
 
+
+## ovs_vport_find_upcall_portid
+
+```c
+u32 ovs_vport_find_upcall_portid(const struct vport *vport, struct sk_buff *skb)
+{
+	struct vport_portids *ids;
+	u32 ids_index;
+	u32 hash;
+
+	ids = rcu_dereference(vport->upcall_portids);
+
+	if (ids->n_ids == 1 && ids->ids[0] == 0)
+		return 0;
+
+	hash = skb_get_hash(skb);   //根据报文得到hash值
+	ids_index = hash - ids->n_ids * reciprocal_divide(hash, ids->rn_ids);
+	return ids->ids[ids_index];
+}
+```
+
+
+## ovs_dp_upcall
+
+```c
 int ovs_dp_upcall(struct datapath *dp, struct sk_buff *skb,
 		  const struct sw_flow_key *key,
 		  const struct dp_upcall_info *upcall_info)
@@ -84,7 +114,12 @@ err:
 
 	return err;
 }
+```
 
+
+### queue_userspace_packet
+
+```c
 static int queue_userspace_packet(struct datapath *dp, struct sk_buff *skb,
 				  const struct sw_flow_key *key,
 				  const struct dp_upcall_info *upcall_info)
@@ -220,7 +255,7 @@ out:
 ```
 
 
-# upcall线程管理
+# upcall线程
 
 ## udpif_set_threads(启动线程)
 
@@ -338,7 +373,7 @@ udpif_flush(struct udpif *udpif)
 ```
 
 
-# upcall线程
+# upcall线程处理函数
 
 ```c
 static void *
@@ -783,7 +818,7 @@ free_dupcall:
 ```
 
 
-## dpif_recv(接收upcall)
+### dpif_recv(接收upcall)
 
 ```c
 int
@@ -793,7 +828,7 @@ dpif_recv(struct dpif *dpif, uint32_t handler_id, struct dpif_upcall *upcall,
     int error = EAGAIN;
 
     if (dpif->dpif_class->recv) {
-        error = dpif->dpif_class->recv(dpif, handler_id, upcall, buf);   //内核态实际调用
+        error = dpif->dpif_class->recv(dpif, handler_id, upcall, buf);   //内核态实际调用dpif_netlink_recv
         if (!error) {
             dpif_print_packet(dpif, upcall);
         } else if (error != EAGAIN) {
@@ -967,7 +1002,7 @@ parse_odp_packet(const struct dpif_netlink *dpif, struct ofpbuf *buf,
 ```
 
 
-## upcall_receive
+### upcall_receive
 
 ```c
 static int
@@ -1089,7 +1124,7 @@ xport_lookup(struct xlate_cfg *xcfg, const struct ofport_dpif *ofport)
 ```
 
 
-## process_upcall(处理upcall)
+### process_upcall(处理upcall)
 
 ```c
 static int
@@ -1184,7 +1219,7 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
 ```
 
 
-## handle_upcalls(处理upcall结果)
+### handle_upcalls(处理upcall结果)
 
 ```c
 
@@ -1357,10 +1392,129 @@ static bool ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
 
 # upcall sock监听
 
-添加port流程中，在dpif_netlink_port_add__函数中会创建netlink sock， 并且调用vport_add_channels， 添加netlink sock到epoll监听中
+当数据面出现upcall时，根据报文入端口的ids中选择一个id作为upcall的线程， 根据skb计算hash来选择哪个id：
+
+1. dpif_netlink_port_add__函数中会创建netlink sock，并并且调用vport_add_channels， 添加netlink sock到epoll监听中；
+2. dpif_netlink_recv__中调用epoll_wait阻塞在所有的upcall socket上；
 
 ```c
+static int
+dpif_netlink_port_add__(struct dpif_netlink *dpif, struct netdev *netdev,
+                        odp_port_t *port_nop)
+    OVS_REQ_WRLOCK(dpif->upcall_lock)
+{
+    const struct netdev_tunnel_config *tnl_cfg;
+    char namebuf[NETDEV_VPORT_NAME_BUFSIZE];
+    const char *name = netdev_vport_get_dpif_port(netdev,
+                                                  namebuf, sizeof namebuf);
+    const char *type = netdev_get_type(netdev);
+    struct dpif_netlink_vport request, reply;
+    struct ofpbuf *buf;
+    uint64_t options_stub[64 / 8];
+    struct ofpbuf options;
+    struct nl_sock **socksp = NULL;
+    uint32_t *upcall_pids;
+    int error = 0;
 
+    if (dpif->handlers) {
+        socksp = vport_create_socksp(dpif, &error);
+        if (!socksp) {
+            return error;
+        }
+    }
+
+    dpif_netlink_vport_init(&request);
+    request.cmd = OVS_VPORT_CMD_NEW;
+    request.dp_ifindex = dpif->dp_ifindex;
+    request.type = netdev_to_ovs_vport_type(netdev);
+    if (request.type == OVS_VPORT_TYPE_UNSPEC) {
+        VLOG_WARN_RL(&error_rl, "%s: cannot create port `%s' because it has "
+                     "unsupported type `%s'",
+                     dpif_name(&dpif->dpif), name, type);
+        vport_del_socksp(dpif, socksp);
+        return EINVAL;
+    }
+    request.name = name;
+
+    if (request.type == OVS_VPORT_TYPE_NETDEV) {
+#ifdef _WIN32
+        /* XXX : Map appropiate Windows handle */
+#else
+        netdev_linux_ethtool_set_flag(netdev, ETH_FLAG_LRO, "LRO", false);
+#endif
+    }
+
+    tnl_cfg = netdev_get_tunnel_config(netdev);
+    if (tnl_cfg && (tnl_cfg->dst_port != 0 || tnl_cfg->exts)) {
+        ofpbuf_use_stack(&options, options_stub, sizeof options_stub);
+        if (tnl_cfg->dst_port) {
+            nl_msg_put_u16(&options, OVS_TUNNEL_ATTR_DST_PORT,
+                           ntohs(tnl_cfg->dst_port));
+        }
+        if (tnl_cfg->exts) {
+            size_t ext_ofs;
+            int i;
+
+            ext_ofs = nl_msg_start_nested(&options, OVS_TUNNEL_ATTR_EXTENSION);
+            for (i = 0; i < 32; i++) {
+                if (tnl_cfg->exts & (1 << i)) {
+                    nl_msg_put_flag(&options, i);
+                }
+            }
+            nl_msg_end_nested(&options, ext_ofs);
+        }
+        request.options = options.data;
+        request.options_len = options.size;
+    }
+
+    request.port_no = *port_nop;
+    upcall_pids = vport_socksp_to_pids(socksp, dpif->n_handlers);
+    request.n_upcall_pids = socksp ? dpif->n_handlers : 1;
+    request.upcall_pids = upcall_pids;
+
+    error = dpif_netlink_vport_transact(&request, &reply, &buf);
+    if (!error) {
+        *port_nop = reply.port_no;
+    } else {
+        if (error == EBUSY && *port_nop != ODPP_NONE) {
+            VLOG_INFO("%s: requested port %"PRIu32" is in use",
+                      dpif_name(&dpif->dpif), *port_nop);
+        }
+
+        vport_del_socksp(dpif, socksp);
+        goto exit;
+    }
+
+    if (socksp) {
+        error = vport_add_channels(dpif, *port_nop, socksp);
+        if (error) {
+            VLOG_INFO("%s: could not add channel for port %s",
+                      dpif_name(&dpif->dpif), name);
+
+            /* Delete the port. */
+            dpif_netlink_vport_init(&request);
+            request.cmd = OVS_VPORT_CMD_DEL;
+            request.dp_ifindex = dpif->dp_ifindex;
+            request.port_no = *port_nop;
+            dpif_netlink_vport_transact(&request, NULL, NULL);
+            vport_del_socksp(dpif, socksp);
+            goto exit;
+        }
+    }
+    free(socksp);
+
+exit:
+    ofpbuf_delete(buf);
+    free(upcall_pids);
+
+    return error;
+}
+```
+
+
+## vport_add_channels
+
+```c
 static int
 vport_add_channels(struct dpif_netlink *dpif, odp_port_t port_no,
                    struct nl_sock **socksp)
@@ -1435,8 +1589,3 @@ error:
     return error;
 }
 ```
-
-
-# upcall整体流程
-
-![flow-update](images/flow-update.png "flow-update")
