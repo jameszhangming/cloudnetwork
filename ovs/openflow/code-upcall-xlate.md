@@ -1,6 +1,10 @@
-# Upcall Xlate
+# upcall处理
 
-本文介绍upcall报文接收到之后的流表处理流程。
+本文介绍用户态接收到upcall报文后，生成action的过程，action可能来源于：
+
+1. Openflow定义的操作；
+2. 端口镜像的操作；
+3. 特殊报文处理；
 
 数据结构：
 
@@ -385,7 +389,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
          * We do not perform special processing on recirculated packets, as
          * recirculated packets are not really received by the bridge.*/
     } else if (in_port && in_port->xbundle
-               && xbundle_mirror_out(xbridge, in_port->xbundle)) {     //执行端口镜像（检测）
+               && xbundle_mirror_out(xbridge, in_port->xbundle)) {     //端口镜像出端口不允许收包
         if (ctx.xin->packet != NULL) {
             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
             VLOG_WARN_RL(&rl, "bridge %s: dropping packet received on port "
@@ -654,7 +658,6 @@ out:
 ### process_special
 
 ```c
-
 static bool
 process_special(struct xlate_ctx *ctx, const struct xport *xport)
 {
@@ -713,10 +716,168 @@ process_special(struct xlate_ctx *ctx, const struct xport *xport)
 ```
 
 
+### xbundle_mirror_out
+
+```c
+static mirror_mask_t
+xbundle_mirror_out(const struct xbridge *xbridge, struct xbundle *xbundle)
+{
+    return xbundle != &ofpp_none_bundle
+        ? mirror_bundle_out(xbridge->mbridge, xbundle->ofbundle)
+        : 0;
+}
+
+mirror_mask_t
+mirror_bundle_out(struct mbridge *mbridge, struct ofbundle *ofbundle)
+{
+    struct mbundle *mbundle = mbundle_lookup(mbridge, ofbundle);
+    return mbundle ? mbundle->mirror_out : 0;
+}
+```
+
+
+### compose_sflow_action
+
+```c
+static size_t
+compose_sflow_action(struct xlate_ctx *ctx)
+{
+    struct dpif_sflow *sflow = ctx->xbridge->sflow;
+    if (!sflow || ctx->xin->flow.in_port.ofp_port == OFPP_NONE) {
+        return 0;
+    }
+
+    union user_action_cookie cookie = { .type = USER_ACTION_COOKIE_SFLOW };
+    return compose_sample_action(ctx, dpif_sflow_get_probability(sflow),
+                                 &cookie, sizeof cookie.sflow, ODPP_NONE,
+                                 true);
+}
+```
+
+
+### compose_ipfix_action
+
+```c
+static void
+compose_ipfix_action(struct xlate_ctx *ctx, odp_port_t output_odp_port)
+{
+    struct dpif_ipfix *ipfix = ctx->xbridge->ipfix;
+    odp_port_t tunnel_out_port = ODPP_NONE;
+
+    if (!ipfix || ctx->xin->flow.in_port.ofp_port == OFPP_NONE) {
+        return;
+    }
+
+    /* For input case, output_odp_port is ODPP_NONE, which is an invalid port
+     * number. */
+    if (output_odp_port == ODPP_NONE &&
+        !dpif_ipfix_get_bridge_exporter_input_sampling(ipfix)) {
+        return;
+    }
+
+    /* For output case, output_odp_port is valid*/
+    if (output_odp_port != ODPP_NONE) {
+        if (!dpif_ipfix_get_bridge_exporter_output_sampling(ipfix)) {
+            return;
+        }
+        /* If tunnel sampling is enabled, put an additional option attribute:
+         * OVS_USERSPACE_ATTR_TUNNEL_OUT_PORT
+         */
+        if (dpif_ipfix_get_bridge_exporter_tunnel_sampling(ipfix) &&
+            dpif_ipfix_get_tunnel_port(ipfix, output_odp_port) ) {
+           tunnel_out_port = output_odp_port;
+        }
+    }
+
+    union user_action_cookie cookie = {
+        .ipfix = {
+            .type = USER_ACTION_COOKIE_IPFIX,
+            .output_odp_port = output_odp_port,
+        }
+    };
+    compose_sample_action(ctx,
+                          dpif_ipfix_get_bridge_exporter_probability(ipfix),
+                          &cookie, sizeof cookie.ipfix, tunnel_out_port,
+                          false);
+}
+```
+
+
+### tnl_process_ecn
+
+```c
+bool
+tnl_process_ecn(struct flow *flow)
+{
+    if (!tnl_port_should_receive(flow)) {
+        return true;
+    }
+
+    if (is_ip_any(flow) && (flow->tunnel.ip_tos & IP_ECN_MASK) == IP_ECN_CE) {
+        if ((flow->nw_tos & IP_ECN_MASK) == IP_ECN_NOT_ECT) {
+            VLOG_WARN_RL(&rl, "dropping tunnel packet marked ECN CE"
+                         " but is not ECN capable");
+            return false;
+        }
+
+        /* Set the ECN CE value in the tunneled packet. */
+        flow->nw_tos |= IP_ECN_CE;
+    }
+
+    flow->pkt_mark &= ~IPSEC_MARK;
+    return true;
+}
+```
+
+
+### may_receive
+
+```c
+static bool
+may_receive(const struct xport *xport, struct xlate_ctx *ctx)
+{
+    if (xport->config & (is_stp(&ctx->xin->flow)
+                         ? OFPUTIL_PC_NO_RECV_STP
+                         : OFPUTIL_PC_NO_RECV)) {
+        return false;
+    }
+
+    /* Only drop packets here if both forwarding and learning are
+     * disabled.  If just learning is enabled, we need to have
+     * OFPP_NORMAL and the learning action have a look at the packet
+     * before we can drop it. */
+    if ((!xport_stp_forward_state(xport) && !xport_stp_learn_state(xport)) ||
+        (!xport_rstp_forward_state(xport) && !xport_rstp_learn_state(xport))) {
+        return false;
+    }
+
+    return true;
+}
+```
+
+
+### mirror_ingress_packet
+
+```c
+static void
+mirror_ingress_packet(struct xlate_ctx *ctx)
+{
+    if (mbridge_has_mirrors(ctx->xbridge->mbridge)) {
+        bool warn = ctx->xin->packet != NULL;
+        struct xbundle *xbundle = lookup_input_bundle(
+            ctx->xbridge, ctx->xin->flow.in_port.ofp_port, warn, NULL);
+        if (xbundle) {
+            mirror_packet(ctx, xbundle,
+                          xbundle_mirror_src(ctx->xbridge, xbundle));
+        }
+    }
+}
+```
+
+
 ### do_xlate_actions
 
 ```c
-
 static void
 do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
                  struct xlate_ctx *ctx)
@@ -1132,445 +1293,71 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 ```
 
 
-# openflow流表操作
-
-
-## rule_dpif_lookup_in_table
-
-```
-static struct rule_dpif *
-rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto, cls_version_t version,
-                          uint8_t table_id, struct flow *flow,
-                          struct flow_wildcards *wc)
-{
-    struct classifier *cls = &ofproto->up.tables[table_id].cls;
-    return rule_dpif_cast(rule_from_cls_rule(classifier_lookup(cls, version,
-                                                               flow, wc)));
-}
-
-const struct cls_rule *
-classifier_lookup(const struct classifier *cls, cls_version_t version,
-                  struct flow *flow, struct flow_wildcards *wc)
-{
-    return classifier_lookup__(cls, version, flow, wc, true);
-}
-
-static const struct cls_rule *
-classifier_lookup__(const struct classifier *cls, cls_version_t version,
-                    struct flow *flow, struct flow_wildcards *wc,
-                    bool allow_conjunctive_matches)
-{
-    struct trie_ctx trie_ctx[CLS_MAX_TRIES];
-    const struct cls_match *match;
-    /* Highest-priority flow in 'cls' that certainly matches 'flow'. */
-    const struct cls_match *hard = NULL;
-    int hard_pri = INT_MIN;     /* hard ? hard->priority : INT_MIN. */
-
-    /* Highest-priority conjunctive flows in 'cls' matching 'flow'.  Since
-     * these are (components of) conjunctive flows, we can only know whether
-     * the full conjunctive flow matches after seeing multiple of them.  Thus,
-     * we refer to these as "soft matches". */
-    struct cls_conjunction_set *soft_stub[64];
-    struct cls_conjunction_set **soft = soft_stub;
-    size_t n_soft = 0, allocated_soft = ARRAY_SIZE(soft_stub);
-    int soft_pri = INT_MIN;    /* n_soft ? MAX(soft[*]->priority) : INT_MIN. */
-
-    /* Synchronize for cls->n_tries and subtable->trie_plen.  They can change
-     * when table configuration changes, which happens typically only on
-     * startup. */
-    atomic_thread_fence(memory_order_acquire);
-
-    /* Initialize trie contexts for find_match_wc(). */
-    for (int i = 0; i < cls->n_tries; i++) {
-        trie_ctx_init(&trie_ctx[i], &cls->tries[i]);
-    }
-
-    /* Main loop. */
-    struct cls_subtable *subtable;
-    PVECTOR_FOR_EACH_PRIORITY (subtable, hard_pri, 2, sizeof *subtable,        //遍历所有的subtable
-                               &cls->subtables) {
-        struct cls_conjunction_set *conj_set;
-
-        /* Skip subtables with no match, or where the match is lower-priority
-         * than some certain match we've already found. */
-        match = find_match_wc(subtable, version, flow, trie_ctx, cls->n_tries,    //检索到cls_match
-                              wc);
-        if (!match || match->priority <= hard_pri) {
-            continue;
-        }
-
-        conj_set = ovsrcu_get(struct cls_conjunction_set *, &match->conj_set);    //得到conjunction set
-        if (!conj_set) {
-            /* 'match' isn't part of a conjunctive match.  It's the best
-             * certain match we've got so far, since we know that it's
-             * higher-priority than hard_pri.
-             *
-             * (There might be a higher-priority conjunctive match.  We can't
-             * tell yet.) */
-            hard = match;                                                         //hard指向当前的match
-            hard_pri = hard->priority;                                            //更新当前的优先级
-        } else if (allow_conjunctive_matches) {
-            /* 'match' is part of a conjunctive match.  Add it to the list. */
-            if (OVS_UNLIKELY(n_soft >= allocated_soft)) {
-                struct cls_conjunction_set **old_soft = soft;
-
-                allocated_soft *= 2;
-                soft = xmalloc(allocated_soft * sizeof *soft);
-                memcpy(soft, old_soft, n_soft * sizeof *soft);
-                if (old_soft != soft_stub) {
-                    free(old_soft);
-                }
-            }
-            soft[n_soft++] = conj_set;
-
-            /* Keep track of the highest-priority soft match. */
-            if (soft_pri < match->priority) {
-                soft_pri = match->priority;
-            }
-        }
-    }
-
-    /* In the common case, at this point we have no soft matches and we can
-     * return immediately.  (We do the same thing if we have potential soft
-     * matches but none of them are higher-priority than our hard match.) */
-    if (hard_pri >= soft_pri) {
-        if (soft != soft_stub) {
-            free(soft);
-        }
-        return hard ? hard->cls_rule : NULL;
-    }
-
-    /* At this point, we have some soft matches.  We might also have a hard
-     * match; if so, its priority is lower than the highest-priority soft
-     * match. */
-
-    /* Soft match loop.
-     *
-     * Check whether soft matches are real matches. */
-    for (;;) {
-        /* Delete soft matches that are null.  This only happens in second and
-         * subsequent iterations of the soft match loop, when we drop back from
-         * a high-priority soft match to a lower-priority one.
-         *
-         * Also, delete soft matches whose priority is less than or equal to
-         * the hard match's priority.  In the first iteration of the soft
-         * match, these can be in 'soft' because the earlier main loop found
-         * the soft match before the hard match.  In second and later iteration
-         * of the soft match loop, these can be in 'soft' because we dropped
-         * back from a high-priority soft match to a lower-priority soft match.
-         *
-         * It is tempting to delete soft matches that cannot be satisfied
-         * because there are fewer soft matches than required to satisfy any of
-         * their conjunctions, but we cannot do that because there might be
-         * lower priority soft or hard matches with otherwise identical
-         * matches.  (We could special case those here, but there's no
-         * need--we'll do so at the bottom of the soft match loop anyway and
-         * this duplicates less code.)
-         *
-         * It's also tempting to break out of the soft match loop if 'n_soft ==
-         * 1' but that would also miss lower-priority hard matches.  We could
-         * special case that also but again there's no need. */
-        for (int i = 0; i < n_soft; ) {
-            if (!soft[i] || soft[i]->priority <= hard_pri) {
-                soft[i] = soft[--n_soft];
-            } else {
-                i++;
-            }
-        }
-        if (!n_soft) {
-            break;
-        }
-
-        /* Find the highest priority among the soft matches.  (We know this
-         * must be higher than the hard match's priority; otherwise we would
-         * have deleted all of the soft matches in the previous loop.)  Count
-         * the number of soft matches that have that priority. */
-        soft_pri = INT_MIN;
-        int n_soft_pri = 0;
-        for (int i = 0; i < n_soft; i++) {
-            if (soft[i]->priority > soft_pri) {
-                soft_pri = soft[i]->priority;
-                n_soft_pri = 1;
-            } else if (soft[i]->priority == soft_pri) {
-                n_soft_pri++;
-            }
-        }
-        ovs_assert(soft_pri > hard_pri);
-
-        /* Look for a real match among the highest-priority soft matches.
-         *
-         * It's unusual to have many conjunctive matches, so we use stubs to
-         * avoid calling malloc() in the common case.  An hmap has a built-in
-         * stub for up to 2 hmap_nodes; possibly, we would benefit a variant
-         * with a bigger stub. */
-        struct conjunctive_match cm_stubs[16];
-        struct hmap matches;
-
-        hmap_init(&matches);
-        for (int i = 0; i < n_soft; i++) {
-            uint32_t id;
-
-            if (soft[i]->priority == soft_pri
-                && find_conjunctive_match(soft[i], n_soft_pri, &matches,
-                                          cm_stubs, ARRAY_SIZE(cm_stubs),
-                                          &id)) {
-                uint32_t saved_conj_id = flow->conj_id;
-                const struct cls_rule *rule;
-
-                flow->conj_id = id;
-                rule = classifier_lookup__(cls, version, flow, wc, false);
-                flow->conj_id = saved_conj_id;
-
-                if (rule) {
-                    free_conjunctive_matches(&matches,
-                                             cm_stubs, ARRAY_SIZE(cm_stubs));
-                    if (soft != soft_stub) {
-                        free(soft);
-                    }
-                    return rule;
-                }
-            }
-        }
-        free_conjunctive_matches(&matches, cm_stubs, ARRAY_SIZE(cm_stubs));
-
-        /* There's no real match among the highest-priority soft matches.
-         * However, if any of those soft matches has a lower-priority but
-         * otherwise identical flow match, then we need to consider those for
-         * soft or hard matches.
-         *
-         * The next iteration of the soft match loop will delete any null
-         * pointers we put into 'soft' (and some others too). */
-        for (int i = 0; i < n_soft; i++) {
-            if (soft[i]->priority != soft_pri) {
-                continue;
-            }
-
-            /* Find next-lower-priority flow with identical flow match. */
-            match = next_visible_rule_in_list(soft[i]->match, version);
-            if (match) {
-                soft[i] = ovsrcu_get(struct cls_conjunction_set *,
-                                     &match->conj_set);
-                if (!soft[i]) {
-                    /* The flow is a hard match; don't treat as a soft
-                     * match. */
-                    if (match->priority > hard_pri) {
-                        hard = match;
-                        hard_pri = hard->priority;
-                    }
-                }
-            } else {
-                /* No such lower-priority flow (probably the common case). */
-                soft[i] = NULL;
-            }
-        }
-    }
-
-    if (soft != soft_stub) {
-        free(soft);
-    }
-    return hard ? hard->cls_rule : NULL;
-}
-```
- 
- 
-### find_match_wc
+## compose_slow_path
 
 ```c
-static const struct cls_match * find_match_wc(const struct cls_subtable *subtable, cls_version_t version,
-              const struct flow *flow, struct trie_ctx trie_ctx[CLS_MAX_TRIES],
-              unsigned int n_tries, struct flow_wildcards *wc)
+static void
+compose_slow_path(struct udpif *udpif, struct xlate_out *xout,
+                  const struct flow *flow, odp_port_t odp_in_port,
+                  struct ofpbuf *buf)
 {
-    if (OVS_UNLIKELY(!wc)) {
-        return find_match(subtable, version, flow,
-                          flow_hash_in_minimask(flow, &subtable->mask, 0));
-    }
+    union user_action_cookie cookie;
+    odp_port_t port;
+    uint32_t pid;
 
-    uint32_t basis = 0, hash;
-    const struct cls_match *rule = NULL;
-    struct flowmap stages_map = FLOWMAP_EMPTY_INITIALIZER;
-    unsigned int mask_offset = 0;
-    int i;
+    cookie.type = USER_ACTION_COOKIE_SLOW_PATH;
+    cookie.slow_path.unused = 0;
+    cookie.slow_path.reason = xout->slow;
 
-    /* Try to finish early by checking fields in segments. */
-    for (i = 0; i < subtable->n_indices; i++) {                    //遍历所有的indices
-        const struct cmap_node *inode;
-
-        if (check_tries(trie_ctx, n_tries, subtable->trie_plen,
-                        subtable->index_maps[i], flow, wc)) {
-            /* 'wc' bits for the trie field set, now unwildcard the preceding
-             * bits used so far. */
-            goto no_match;
-        }
-
-        /* Accumulate the map used so far. */
-        stages_map = flowmap_or(stages_map, subtable->index_maps[i]);
-
-        hash = flow_hash_in_minimask_range(flow, &subtable->mask,   //flow和mask计算出masked_flow，然后计算出hash值
-                                           subtable->index_maps[i],
-                                           &mask_offset, &basis);
-
-        inode = cmap_find(&subtable->indices[i], hash);            //根据hash检索到node节点
-        if (!inode) {
-            goto no_match;
-        }
-
-        /* If we have narrowed down to a single rule already, check whether
-         * that rule matches.  Either way, we're done.
-         *
-         * (Rare) hash collisions may cause us to miss the opportunity for this
-         * optimization. */
-        if (!cmap_node_next(inode)) {
-            const struct cls_match *head;
-
-            ASSIGN_CONTAINER(head, inode - i, index_nodes);      //得到cls_match
-            if (miniflow_and_mask_matches_flow_wc(&head->flow, &subtable->mask,      //check是否匹配
-                                                  flow, wc)) {
-                /* Return highest priority rule that is visible. */
-                CLS_MATCH_FOR_EACH (rule, head) {
-                    if (OVS_LIKELY(cls_match_visible_in_version(rule,
-                                                                version))) {
-                        return rule;
-                    }
-                }
-            }
-            return NULL;
-        }
-    }
-    /* Trie check for the final range. */
-    if (check_tries(trie_ctx, n_tries, subtable->trie_plen,
-                    subtable->index_maps[i], flow, wc)) {
-        goto no_match;
-    }
-    hash = flow_hash_in_minimask_range(flow, &subtable->mask,
-                                       subtable->index_maps[i],
-                                       &mask_offset, &basis);
-    rule = find_match(subtable, version, flow, hash);
-    if (!rule && subtable->ports_mask_len) {
-        /* The final stage had ports, but there was no match.  Instead of
-         * unwildcarding all the ports bits, use the ports trie to figure out a
-         * smaller set of bits to unwildcard. */
-        unsigned int mbits;
-        ovs_be32 value, plens, mask;
-
-        mask = MINIFLOW_GET_BE32(&subtable->mask.masks, tp_src);
-        value = ((OVS_FORCE ovs_be32 *)flow)[TP_PORTS_OFS32] & mask;
-        mbits = trie_lookup_value(&subtable->ports_trie, &value, &plens, 32);
-
-        ((OVS_FORCE ovs_be32 *)&wc->masks)[TP_PORTS_OFS32] |=
-            mask & be32_prefix_mask(mbits);
-
-        goto no_match;
-    }
-
-    /* Must unwildcard all the fields, as they were looked at. */
-    flow_wildcards_fold_minimask(wc, &subtable->mask);
-    return rule;
-
-no_match:
-    /* Unwildcard the bits in stages so far, as they were used in determining
-     * there is no match. */
-    flow_wildcards_fold_minimask_in_map(wc, &subtable->mask, stages_map);
-    return NULL;
-}
-
-static inline uint32_t
-flow_hash_in_minimask_range(const struct flow *flow,
-                            const struct minimask *mask,
-                            const struct flowmap range,
-                            unsigned int *offset,
-                            uint32_t *basis)
-{
-    const uint64_t *mask_values = miniflow_get_values(&mask->masks);
-    const uint64_t *flow_u64 = (const uint64_t *)flow;
-    const uint64_t *p = mask_values + *offset;
-    uint32_t hash = *basis;
-    map_t map;
-
-    FLOWMAP_FOR_EACH_MAP (map, range) {
-        size_t idx;
-
-        MAP_FOR_EACH_INDEX (idx, map) {
-            hash = hash_add64(hash, flow_u64[idx] & *p++);     //flow和mask与值计算hash值
-        }
-        flow_u64 += MAP_T_BITS;
-    }
-
-    *basis = hash; /* Allow continuation from the unfinished value. */
-    *offset = p - mask_values;
-    return hash_finish(hash, *offset * 8);
+    port = xout->slow & (SLOW_CFM | SLOW_BFD | SLOW_LACP | SLOW_STP)
+        ? ODPP_NONE
+        : odp_in_port;
+    pid = dpif_port_get_pid(udpif->dpif, port, flow_hash_5tuple(flow, 0));
+    odp_put_userspace_action(pid, &cookie, sizeof cookie.slow_path,
+                             ODPP_NONE, false, buf);
 }
 ```
 
 
-### miniflow_and_mask_matches_flow_wc
+## ukey_create_from_upcall
 
 ```c
-static inline bool
-miniflow_and_mask_matches_flow_wc(const struct miniflow *flow,
-                                  const struct minimask *mask,
-                                  const struct flow *target,
-                                  struct flow_wildcards *wc)
+static struct udpif_key *
+ukey_create_from_upcall(struct upcall *upcall, struct flow_wildcards *wc)
 {
-    const uint64_t *flowp = miniflow_get_values(flow);
-    const uint64_t *maskp = miniflow_get_values(&mask->masks);
-    const uint64_t *target_u64 = (const uint64_t *)target;
-    uint64_t *wc_u64 = (uint64_t *)&wc->masks;
-    uint64_t diff;
-    size_t idx;
-    map_t map;
+    struct odputil_keybuf keystub, maskstub;
+    struct ofpbuf keybuf, maskbuf;
+    bool megaflow;
+    struct odp_flow_key_parms odp_parms = {
+        .flow = upcall->flow,
+        .mask = &wc->masks,
+    };
 
-    FLOWMAP_FOR_EACH_MAP (map, mask->masks.map) {     //遍历所有map
-        MAP_FOR_EACH_INDEX(idx, map) {                //获取map对应index置1
-            uint64_t msk = *maskp++;
-
-            diff = (*flowp++ ^ target_u64[idx]) & msk;   //比较是否相同
-            if (diff) {
-                goto out;
-            }
-
-            /* Fill in the bits that were looked at. */
-            wc_u64[idx] |= msk;
-        }
-        target_u64 += MAP_T_BITS;
-        wc_u64 += MAP_T_BITS;
-    }
-    return true;
-
-out:
-    /* Only unwildcard if none of the differing bits is already
-     * exact-matched. */
-    if (!(wc_u64[idx] & diff)) {
-        /* Keep one bit of the difference.  The selected bit may be
-         * different in big-endian v.s. little-endian systems. */
-        wc_u64[idx] |= rightmost_1bit(diff);
-    }
-    return false;
-}
-```
-
-
-### find_match
-
-```c
-static inline const struct cls_match *
-find_match(const struct cls_subtable *subtable, cls_version_t version,
-           const struct flow *flow, uint32_t hash)
-{
-    const struct cls_match *head, *rule;
-
-    CMAP_FOR_EACH_WITH_HASH (head, cmap_node, hash, &subtable->rules) {     //遍历rules map
-        if (OVS_LIKELY(miniflow_and_mask_matches_flow(&head->flow,          //check 流表匹配
-                                                      &subtable->mask,
-                                                      flow))) {
-            /* Return highest priority rule that is visible. */
-            CLS_MATCH_FOR_EACH (rule, head) {
-                if (OVS_LIKELY(cls_match_visible_in_version(rule, version))) {
-                    return rule;
-                }
-            }
-        }
+    odp_parms.support = ofproto_dpif_get_support(upcall->ofproto)->odp;
+    if (upcall->key_len) {
+        ofpbuf_use_const(&keybuf, upcall->key, upcall->key_len);
+    } else {
+        /* dpif-netdev doesn't provide a netlink-formatted flow key in the
+         * upcall, so convert the upcall's flow here. */
+        ofpbuf_use_stack(&keybuf, &keystub, sizeof keystub);
+        odp_parms.odp_in_port = upcall->flow->in_port.odp_port;
+        odp_flow_key_from_flow(&odp_parms, &keybuf);
     }
 
-    return NULL;
+    atomic_read_relaxed(&enable_megaflows, &megaflow);
+    ofpbuf_use_stack(&maskbuf, &maskstub, sizeof maskstub);
+    if (megaflow) {
+        odp_parms.odp_in_port = ODPP_NONE;
+        odp_parms.key_buf = &keybuf;
+
+        odp_flow_key_from_mask(&odp_parms, &maskbuf);
+    }
+
+    return ukey_create__(keybuf.data, keybuf.size, maskbuf.data, maskbuf.size,
+                         true, upcall->ufid, upcall->pmd_id,
+                         &upcall->put_actions, upcall->dump_seq,
+                         upcall->reval_seq, 0,
+                         upcall->have_recirc_ref ? upcall->recirc->id : 0,
+                         &upcall->xout);
 }
 ```
