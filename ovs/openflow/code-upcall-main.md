@@ -1,4 +1,4 @@
-# OVS Upcall
+# upcall整体流程
 
 内核OVS数据面出现流表不能匹配时，会upcall到OVSD进行流表匹配，匹配成功后将下发流表到数据面。
 
@@ -255,7 +255,8 @@ out:
 ```
 
 
-# upcall线程
+# upcall线程管理
+
 
 ## udpif_set_threads(启动线程)
 
@@ -386,7 +387,8 @@ udpif_upcall_handler(void *arg)
         if (recv_upcalls(handler)) {  //接收upcall并处理
             poll_immediate_wake();    //不阻塞，说明还有upcall需要处理
         } else {
-            dpif_recv_wait(udpif->dpif, handler->handler_id);  //阻塞在netlink接收上，handler和dpif_handler对应，监听相同handler_id的sock
+		    //阻塞在netlink接收上，handler和dpif_handler对应，监听相同handler_id的sock
+            dpif_recv_wait(udpif->dpif, handler->handler_id);  
             latch_wait(&udpif->exit_latch);
         }
         poll_block();   //poll阻塞
@@ -395,6 +397,7 @@ udpif_upcall_handler(void *arg)
     return NULL;
 }
 ```
+
 
 ## poll机制
 
@@ -789,7 +792,7 @@ recv_upcalls(struct handler *handler)
         flow_extract(&dupcall->packet, flow);	//生成flow
 
         error = process_upcall(udpif, upcall,
-                               &upcall->odp_actions, &upcall->wc);   //处理upcall，下发流表
+                               &upcall->odp_actions, &upcall->wc);   //用户态流表查找
         if (error) {
             goto cleanup;
         }
@@ -805,7 +808,7 @@ free_dupcall:
     }
 
     if (n_upcalls) {
-        handle_upcalls(handler->udpif, upcalls, n_upcalls);      //handle upcalls
+        handle_upcalls(handler->udpif, upcalls, n_upcalls);   //处理upcall结果，例如添加流表
         for (i = 0; i < n_upcalls; i++) {
             dp_packet_uninit(&dupcalls[i].packet);
             ofpbuf_uninit(&recv_bufs[i]);
@@ -1120,272 +1123,6 @@ xport_lookup(struct xlate_cfg *xcfg, const struct ofport_dpif *ofport)
         }
     }
     return NULL;
-}
-```
-
-
-### process_upcall(处理upcall)
-
-```c
-static int
-process_upcall(struct udpif *udpif, struct upcall *upcall,
-               struct ofpbuf *odp_actions, struct flow_wildcards *wc)
-{
-    const struct nlattr *userdata = upcall->userdata;
-    const struct dp_packet *packet = upcall->packet;
-    const struct flow *flow = upcall->flow;
-
-    switch (classify_upcall(upcall->type, userdata)) {
-    case MISS_UPCALL:
-        upcall_xlate(udpif, upcall, odp_actions, wc);          //流表miss，流表查询
-        return 0;
-
-    case SFLOW_UPCALL:
-        if (upcall->sflow) {
-            union user_action_cookie cookie;
-            const struct nlattr *actions;
-            size_t actions_len = 0;
-            struct dpif_sflow_actions sflow_actions;
-            memset(&sflow_actions, 0, sizeof sflow_actions);
-            memset(&cookie, 0, sizeof cookie);
-            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.sflow);	//读取user data信息
-            if (upcall->actions) {
-                /* Actions were passed up from datapath. */
-                actions = nl_attr_get(upcall->actions);
-                actions_len = nl_attr_get_size(upcall->actions);
-                if (actions && actions_len) {
-                    dpif_sflow_read_actions(flow, actions, actions_len,		//获取sflow action
-                                            &sflow_actions);
-                }
-            }
-            if (actions_len == 0) {
-                /* Lookup actions in userspace cache. */
-                struct udpif_key *ukey = ukey_lookup(udpif, upcall->ufid);	//用户态cache，加速
-                if (ukey) {
-                    ukey_get_actions(ukey, &actions, &actions_len);
-                    dpif_sflow_read_actions(flow, actions, actions_len,
-                                            &sflow_actions);
-                }
-            }
-            dpif_sflow_received(upcall->sflow, packet, flow,			//sflow消息处理
-                                flow->in_port.odp_port, &cookie,
-                                actions_len > 0 ? &sflow_actions : NULL);
-        }
-        break;
-
-    case IPFIX_UPCALL:
-        if (upcall->ipfix) {
-            union user_action_cookie cookie;
-            struct flow_tnl output_tunnel_key;
-
-            memset(&cookie, 0, sizeof cookie);
-            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.ipfix);
-
-            if (upcall->out_tun_key) {
-                odp_tun_key_from_attr(upcall->out_tun_key, false,
-                                      &output_tunnel_key);
-            }
-            dpif_ipfix_bridge_sample(upcall->ipfix, packet, flow,
-                                     flow->in_port.odp_port,
-                                     cookie.ipfix.output_odp_port,
-                                     upcall->out_tun_key ?
-                                         &output_tunnel_key : NULL);
-        }
-        break;
-
-    case FLOW_SAMPLE_UPCALL:
-        if (upcall->ipfix) {
-            union user_action_cookie cookie;
-
-            memset(&cookie, 0, sizeof cookie);
-            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.flow_sample);
-
-            /* The flow reflects exactly the contents of the packet.
-             * Sample the packet using it. */
-            dpif_ipfix_flow_sample(upcall->ipfix, packet, flow,
-                                   cookie.flow_sample.collector_set_id,
-                                   cookie.flow_sample.probability,
-                                   cookie.flow_sample.obs_domain_id,
-                                   cookie.flow_sample.obs_point_id);
-        }
-        break;
-
-    case BAD_UPCALL:
-        break;
-    }
-
-    return EAGAIN;
-}
-```
-
-
-### handle_upcalls(处理upcall结果)
-
-```c
-
-static void
-handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
-               size_t n_upcalls)
-{
-    struct dpif_op *opsp[UPCALL_MAX_BATCH * 2];
-    struct ukey_op ops[UPCALL_MAX_BATCH * 2];
-    unsigned int flow_limit;
-    size_t n_ops, n_opsp, i;
-    bool may_put;
-
-    atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
-
-    may_put = udpif_get_n_flows(udpif) < flow_limit;     //检查数据面的流表数是否超过上限
-
-    /* Handle the packets individually in order of arrival.
-     *
-     *   - For SLOW_CFM, SLOW_LACP, SLOW_STP, and SLOW_BFD, translation is what
-     *     processes received packets for these protocols.
-     *
-     *   - For SLOW_CONTROLLER, translation sends the packet to the OpenFlow
-     *     controller.
-     *
-     * The loop fills 'ops' with an array of operations to execute in the
-     * datapath. */
-    n_ops = 0;
-    for (i = 0; i < n_upcalls; i++) {
-        struct upcall *upcall = &upcalls[i];
-        const struct dp_packet *packet = upcall->packet;
-        struct ukey_op *op;
-
-        if (upcall->vsp_adjusted) {
-            /* This packet was received on a VLAN splinter port.  We added a
-             * VLAN to the packet to make the packet resemble the flow, but the
-             * actions were composed assuming that the packet contained no
-             * VLAN.  So, we must remove the VLAN header from the packet before
-             * trying to execute the actions. */
-            if (upcall->odp_actions.size) {
-                eth_pop_vlan(CONST_CAST(struct dp_packet *, upcall->packet));
-            }
-
-            /* Remove the flow vlan tags inserted by vlan splinter logic
-             * to ensure megaflow masks generated match the data path flow. */
-            CONST_CAST(struct flow *, upcall->flow)->vlan_tci = 0;
-        }
-
-        /* Do not install a flow into the datapath if:
-         *
-         *    - The datapath already has too many flows.
-         *
-         *    - We received this packet via some flow installed in the kernel
-         *      already.
-         *
-         *    - Upcall was a recirculation but we do not have a reference to
-         *      to the recirculation ID. */
-        if (may_put && upcall->type == DPIF_UC_MISS &&
-            (!upcall->recirc || upcall->have_recirc_ref)) {    //进此流程
-            struct udpif_key *ukey = upcall->ukey;
-
-            upcall->ukey_persists = true;
-            op = &ops[n_ops++];
-
-            op->ukey = ukey;
-            op->dop.type = DPIF_OP_FLOW_PUT;
-            op->dop.u.flow_put.flags = DPIF_FP_CREATE;
-            op->dop.u.flow_put.key = ukey->key;
-            op->dop.u.flow_put.key_len = ukey->key_len;
-            op->dop.u.flow_put.mask = ukey->mask;
-            op->dop.u.flow_put.mask_len = ukey->mask_len;
-            op->dop.u.flow_put.ufid = upcall->ufid;
-            op->dop.u.flow_put.stats = NULL;
-            ukey_get_actions(ukey, &op->dop.u.flow_put.actions,   //ukey的actions根据upcall的put_action生成
-                             &op->dop.u.flow_put.actions_len);
-        }
-
-        if (upcall->odp_actions.size) {
-            op = &ops[n_ops++];
-            op->ukey = NULL;
-            op->dop.type = DPIF_OP_EXECUTE;
-            op->dop.u.execute.packet = CONST_CAST(struct dp_packet *, packet);
-            odp_key_to_pkt_metadata(upcall->key, upcall->key_len,
-                                    &op->dop.u.execute.packet->md);
-            op->dop.u.execute.actions = upcall->odp_actions.data;
-            op->dop.u.execute.actions_len = upcall->odp_actions.size;
-            op->dop.u.execute.needs_help = (upcall->xout.slow & SLOW_ACTION) != 0;
-            op->dop.u.execute.probe = false;
-            op->dop.u.execute.mtu = upcall->mru;
-        }
-    }
-
-    /* Execute batch.
-     *
-     * We install ukeys before installing the flows, locking them for exclusive
-     * access by this thread for the period of installation. This ensures that
-     * other threads won't attempt to delete the flows as we are creating them.
-     */
-    n_opsp = 0;
-    for (i = 0; i < n_ops; i++) {
-        struct udpif_key *ukey = ops[i].ukey;
-
-        if (ukey) {
-            /* If we can't install the ukey, don't install the flow. */
-            if (!ukey_install_start(udpif, ukey)) {      //ukey install，如果成功则可以安装flow
-                ukey_delete__(ukey);
-                ops[i].ukey = NULL;
-                continue;
-            }
-        }
-        opsp[n_opsp++] = &ops[i].dop;
-    }
-    dpif_operate(udpif->dpif, opsp, n_opsp);     //执行actions，执行flow插入到dp
-    for (i = 0; i < n_ops; i++) {
-        if (ops[i].ukey) {
-            ukey_install_finish(ops[i].ukey, ops[i].dop.error);
-        }
-    }
-}
-
-static void ukey_get_actions(struct udpif_key *ukey, const struct nlattr **actions, size_t *size)
-{
-    const struct ofpbuf *buf = ovsrcu_get(struct ofpbuf *, &ukey->actions);
-    *actions = buf->data;
-    *size = buf->size;
-}
-
-static bool ukey_install_start(struct udpif *udpif, struct udpif_key *new_ukey)
-    OVS_TRY_LOCK(true, new_ukey->mutex)
-{
-    struct umap *umap;
-    struct udpif_key *old_ukey;
-    uint32_t idx;
-    bool locked = false;
-
-    idx = new_ukey->hash % N_UMAPS;
-    umap = &udpif->ukeys[idx];        //数组map，得到ukey对应的map
-    ovs_mutex_lock(&umap->mutex);
-    old_ukey = ukey_lookup(udpif, &new_ukey->ufid);
-    if (old_ukey) {
-        /* Uncommon case: A ukey is already installed with the same UFID. */
-        if (old_ukey->key_len == new_ukey->key_len
-            && !memcmp(old_ukey->key, new_ukey->key, new_ukey->key_len)) {
-            COVERAGE_INC(handler_duplicate_upcall);
-        } else {
-            struct ds ds = DS_EMPTY_INITIALIZER;
-
-            odp_format_ufid(&old_ukey->ufid, &ds);
-            ds_put_cstr(&ds, " ");
-            odp_flow_key_format(old_ukey->key, old_ukey->key_len, &ds);
-            ds_put_cstr(&ds, "\n");
-            odp_format_ufid(&new_ukey->ufid, &ds);
-            ds_put_cstr(&ds, " ");
-            odp_flow_key_format(new_ukey->key, new_ukey->key_len, &ds);
-
-            VLOG_WARN_RL(&rl, "Conflicting ukey for flows:\n%s", ds_cstr(&ds));
-            ds_destroy(&ds);
-        }
-    } else {
-        ovs_mutex_lock(&new_ukey->mutex);
-        cmap_insert(&umap->cmap, &new_ukey->cmap_node, new_ukey->hash);    //插入到bucket中
-        locked = true;
-    }
-    ovs_mutex_unlock(&umap->mutex);
-
-    return locked;
 }
 ```
 

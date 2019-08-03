@@ -31,10 +31,104 @@ ofproto flow数据结构：
 1. subtable的indices作用是什么，为什么不直接使用rules来检索cls_match；
 
 
-# upcall_xlate
+# process_upcall(入口)
 
 ```c
+static int
+process_upcall(struct udpif *udpif, struct upcall *upcall,
+               struct ofpbuf *odp_actions, struct flow_wildcards *wc)
+{
+    const struct nlattr *userdata = upcall->userdata;
+    const struct dp_packet *packet = upcall->packet;
+    const struct flow *flow = upcall->flow;
 
+    switch (classify_upcall(upcall->type, userdata)) {
+    case MISS_UPCALL:
+        upcall_xlate(udpif, upcall, odp_actions, wc);          //流表miss，流表查询
+        return 0;
+
+    case SFLOW_UPCALL:
+        if (upcall->sflow) {
+            union user_action_cookie cookie;
+            const struct nlattr *actions;
+            size_t actions_len = 0;
+            struct dpif_sflow_actions sflow_actions;
+            memset(&sflow_actions, 0, sizeof sflow_actions);
+            memset(&cookie, 0, sizeof cookie);
+            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.sflow);	//读取user data信息
+            if (upcall->actions) {
+                /* Actions were passed up from datapath. */
+                actions = nl_attr_get(upcall->actions);
+                actions_len = nl_attr_get_size(upcall->actions);
+                if (actions && actions_len) {
+                    dpif_sflow_read_actions(flow, actions, actions_len,		//获取sflow action
+                                            &sflow_actions);
+                }
+            }
+            if (actions_len == 0) {
+                /* Lookup actions in userspace cache. */
+                struct udpif_key *ukey = ukey_lookup(udpif, upcall->ufid);	//用户态cache，加速
+                if (ukey) {
+                    ukey_get_actions(ukey, &actions, &actions_len);
+                    dpif_sflow_read_actions(flow, actions, actions_len,
+                                            &sflow_actions);
+                }
+            }
+            dpif_sflow_received(upcall->sflow, packet, flow,			//sflow消息处理
+                                flow->in_port.odp_port, &cookie,
+                                actions_len > 0 ? &sflow_actions : NULL);
+        }
+        break;
+
+    case IPFIX_UPCALL:
+        if (upcall->ipfix) {
+            union user_action_cookie cookie;
+            struct flow_tnl output_tunnel_key;
+
+            memset(&cookie, 0, sizeof cookie);
+            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.ipfix);
+
+            if (upcall->out_tun_key) {
+                odp_tun_key_from_attr(upcall->out_tun_key, false,
+                                      &output_tunnel_key);
+            }
+            dpif_ipfix_bridge_sample(upcall->ipfix, packet, flow,
+                                     flow->in_port.odp_port,
+                                     cookie.ipfix.output_odp_port,
+                                     upcall->out_tun_key ?
+                                         &output_tunnel_key : NULL);
+        }
+        break;
+
+    case FLOW_SAMPLE_UPCALL:
+        if (upcall->ipfix) {
+            union user_action_cookie cookie;
+
+            memset(&cookie, 0, sizeof cookie);
+            memcpy(&cookie, nl_attr_get(userdata), sizeof cookie.flow_sample);
+
+            /* The flow reflects exactly the contents of the packet.
+             * Sample the packet using it. */
+            dpif_ipfix_flow_sample(upcall->ipfix, packet, flow,
+                                   cookie.flow_sample.collector_set_id,
+                                   cookie.flow_sample.probability,
+                                   cookie.flow_sample.obs_domain_id,
+                                   cookie.flow_sample.obs_point_id);
+        }
+        break;
+
+    case BAD_UPCALL:
+        break;
+    }
+
+    return EAGAIN;
+}
+```
+
+
+# upcall_xlate(MISS)
+
+```c
 static void
 upcall_xlate(struct udpif *udpif, struct upcall *upcall,
              struct ofpbuf *odp_actions, struct flow_wildcards *wc)
