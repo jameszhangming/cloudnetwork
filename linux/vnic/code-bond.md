@@ -1,4 +1,4 @@
-# Bond
+# Bond简介
 
 bond是把多个物理网卡聚合成一张虚拟网卡，协议栈使用该虚拟网卡对外通信，实现网络高可用，本文介绍bond设备初始化过程以及报文处理流程。
 
@@ -40,9 +40,9 @@ bond是把多个物理网卡聚合成一张虚拟网卡，协议栈使用该虚�
 * mode=0：平衡负载模式，有自动备援，但需要”Switch”支援及设定。
 * mode=1：自动备援模式，其中一条线若断线，其他线路将会自动备援。
 * mode=6：平衡负载模式，有自动备援，不必”Switch”支援及设定。
-  
-  
-## 数据结构
+
+
+# 数据结构
 
 ```c
 struct rtnl_link_ops bond_link_ops __read_mostly = {
@@ -103,7 +103,7 @@ static const struct ethtool_ops bond_ethtool_ops = {
 };
 ```
 
-## 模块初始化
+# 模块初始化
 
 ```c
 static int __init bonding_init(void)
@@ -147,7 +147,13 @@ err_link:
 }
 ```
 
-## bond设备创建
+# bond设备创建
+
+
+设备创建调用流程：
+
+![vnic-init-flow](images/vnic-init-flow.png "vnic-init-flow")
+
 
 bond设备的创建入口为rtnl_newlink函数（虚拟网卡创建入口），根据调用顺序来分析各个函数：
 
@@ -159,7 +165,7 @@ bond设备的创建入口为rtnl_newlink函数（虚拟网卡创建入口），�
 6. dev->netdev_ops->ndo_open（打开设备）
 
 
-### validate(bond_validate)
+## validate(bond_validate)
 
 ```c
 static int bond_validate(struct nlattr *tb[], struct nlattr *data[])
@@ -175,7 +181,7 @@ static int bond_validate(struct nlattr *tb[], struct nlattr *data[])
 ```
 
 
-### setup(bond_setup)
+## setup(bond_setup)
 
 ```c
 void bond_setup(struct net_device *bond_dev)
@@ -228,7 +234,7 @@ void bond_setup(struct net_device *bond_dev)
 ```
 
 
-### newlink(bond_newlink)
+## newlink(bond_newlink)
 
 ```c
 static int bond_newlink(struct net *src_net, struct net_device *bond_dev,
@@ -514,7 +520,7 @@ static int bond_netdev_event(struct notifier_block *this,
 ```
 
 
-### ndo_init(bond_init)
+## ndo_init(bond_init)
 
 ```c
 static int bond_init(struct net_device *bond_dev)
@@ -546,7 +552,7 @@ static int bond_init(struct net_device *bond_dev)
 ```
 
 
-### ndo_open(bond_open)
+## ndo_open(bond_open)
 
 ```c
 static int bond_open(struct net_device *bond_dev)
@@ -604,7 +610,7 @@ static int bond_open(struct net_device *bond_dev)
 ```
 
 
-## bond添加网卡
+# bond添加网卡
 
 ```c
 static int bond_option_slaves_set(struct bonding *bond,
@@ -655,7 +661,7 @@ err_no_cmd:
 ```
 
 
-### bond_enslave
+## bond_enslave
 
 ```c
 int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
@@ -1111,7 +1117,7 @@ err_undo_flags:
 ```
 
 
-## bond底层设备收包处理
+# bond收包处理
 
 ```c
 static rx_handler_result_t bond_handle_frame(struct sk_buff **pskb)
@@ -1164,7 +1170,208 @@ static rx_handler_result_t bond_handle_frame(struct sk_buff **pskb)
 ```
 
 
-## bond设备发包处理
+## bond_3ad_lacpdu_recv
+
+```c
+int bond_3ad_lacpdu_recv(const struct sk_buff *skb, struct bonding *bond,
+			 struct slave *slave)
+{
+	struct lacpdu *lacpdu, _lacpdu;
+
+	if (skb->protocol != PKT_TYPE_LACPDU)
+		return RX_HANDLER_ANOTHER;
+
+	if (!MAC_ADDRESS_EQUAL(eth_hdr(skb)->h_dest, lacpdu_mcast_addr))
+		return RX_HANDLER_ANOTHER;
+
+	lacpdu = skb_header_pointer(skb, 0, sizeof(_lacpdu), &_lacpdu);
+	if (!lacpdu)
+		return RX_HANDLER_ANOTHER;
+
+	return bond_3ad_rx_indication(lacpdu, slave, skb->len);
+}
+
+static int bond_3ad_rx_indication(struct lacpdu *lacpdu, struct slave *slave,
+				  u16 length)
+{
+	struct port *port;
+	int ret = RX_HANDLER_ANOTHER;
+
+	if (length >= sizeof(struct lacpdu)) {
+
+		port = &(SLAVE_AD_INFO(slave)->port);
+
+		if (!port->slave) {
+			net_warn_ratelimited("%s: Warning: port of slave %s is uninitialized\n",
+					     slave->dev->name, slave->bond->dev->name);
+			return ret;
+		}
+
+		switch (lacpdu->subtype) {
+		case AD_TYPE_LACPDU:
+			ret = RX_HANDLER_CONSUMED;
+			netdev_dbg(slave->bond->dev,
+				   "Received LACPDU on port %d slave %s\n",
+				   port->actor_port_number,
+				   slave->dev->name);
+			/* Protect against concurrent state machines */
+			spin_lock(&slave->bond->mode_lock);
+			ad_rx_machine(lacpdu, port);
+			spin_unlock(&slave->bond->mode_lock);
+			break;
+
+		case AD_TYPE_MARKER:
+			ret = RX_HANDLER_CONSUMED;
+			/* No need to convert fields to Little Endian since we
+			 * don't use the marker's fields.
+			 */
+
+			switch (((struct bond_marker *)lacpdu)->tlv_type) {
+			case AD_MARKER_INFORMATION_SUBTYPE:
+				netdev_dbg(slave->bond->dev, "Received Marker Information on port %d\n",
+					   port->actor_port_number);
+				ad_marker_info_received((struct bond_marker *)lacpdu, port);
+				break;
+
+			case AD_MARKER_RESPONSE_SUBTYPE:
+				netdev_dbg(slave->bond->dev, "Received Marker Response on port %d\n",
+					   port->actor_port_number);
+				ad_marker_response_received((struct bond_marker *)lacpdu, port);
+				break;
+
+			default:
+				netdev_dbg(slave->bond->dev, "Received an unknown Marker subtype on slot %d\n",
+					   port->actor_port_number);
+			}
+		}
+	}
+	return ret;
+}
+```
+
+
+## bond_arp_rcv
+
+```c
+int bond_arp_rcv(const struct sk_buff *skb, struct bonding *bond,
+		 struct slave *slave)
+{
+	struct arphdr *arp = (struct arphdr *)skb->data;
+	struct slave *curr_active_slave;
+	unsigned char *arp_ptr;
+	__be32 sip, tip;
+	int alen, is_arp = skb->protocol == __cpu_to_be16(ETH_P_ARP);
+
+	if (!slave_do_arp_validate(bond, slave)) {
+		if ((slave_do_arp_validate_only(bond) && is_arp) ||
+		    !slave_do_arp_validate_only(bond))
+			slave->last_rx = jiffies;
+		return RX_HANDLER_ANOTHER;
+	} else if (!is_arp) {
+		return RX_HANDLER_ANOTHER;
+	}
+
+	alen = arp_hdr_len(bond->dev);
+
+	netdev_dbg(bond->dev, "bond_arp_rcv: skb->dev %s\n",
+		   skb->dev->name);
+
+	if (alen > skb_headlen(skb)) {
+		arp = kmalloc(alen, GFP_ATOMIC);
+		if (!arp)
+			goto out_unlock;
+		if (skb_copy_bits(skb, 0, arp, alen) < 0)
+			goto out_unlock;
+	}
+
+	if (arp->ar_hln != bond->dev->addr_len ||
+	    skb->pkt_type == PACKET_OTHERHOST ||
+	    skb->pkt_type == PACKET_LOOPBACK ||
+	    arp->ar_hrd != htons(ARPHRD_ETHER) ||
+	    arp->ar_pro != htons(ETH_P_IP) ||
+	    arp->ar_pln != 4)
+		goto out_unlock;
+
+	arp_ptr = (unsigned char *)(arp + 1);
+	arp_ptr += bond->dev->addr_len;
+	memcpy(&sip, arp_ptr, 4);
+	arp_ptr += 4 + bond->dev->addr_len;
+	memcpy(&tip, arp_ptr, 4);
+
+	netdev_dbg(bond->dev, "bond_arp_rcv: %s/%d av %d sv %d sip %pI4 tip %pI4\n",
+		   slave->dev->name, bond_slave_state(slave),
+		     bond->params.arp_validate, slave_do_arp_validate(bond, slave),
+		     &sip, &tip);
+
+	curr_active_slave = rcu_dereference(bond->curr_active_slave);
+
+	/* Backup slaves won't see the ARP reply, but do come through
+	 * here for each ARP probe (so we swap the sip/tip to validate
+	 * the probe).  In a "redundant switch, common router" type of
+	 * configuration, the ARP probe will (hopefully) travel from
+	 * the active, through one switch, the router, then the other
+	 * switch before reaching the backup.
+	 *
+	 * We 'trust' the arp requests if there is an active slave and
+	 * it received valid arp reply(s) after it became active. This
+	 * is done to avoid endless looping when we can't reach the
+	 * arp_ip_target and fool ourselves with our own arp requests.
+	 */
+
+	if (bond_is_active_slave(slave))
+		bond_validate_arp(bond, slave, sip, tip);
+	else if (curr_active_slave &&
+		 time_after(slave_last_rx(bond, curr_active_slave),
+			    curr_active_slave->last_link_up))
+		bond_validate_arp(bond, slave, tip, sip);
+
+out_unlock:
+	if (arp != (struct arphdr *)skb->data)
+		kfree(arp);
+	return RX_HANDLER_ANOTHER;
+}
+```
+
+
+## rlb_arp_recv
+
+```c
+static int rlb_arp_recv(const struct sk_buff *skb, struct bonding *bond,
+			struct slave *slave)
+{
+	struct arp_pkt *arp, _arp;
+
+	if (skb->protocol != cpu_to_be16(ETH_P_ARP))
+		goto out;
+
+	arp = skb_header_pointer(skb, 0, sizeof(_arp), &_arp);
+	if (!arp)
+		goto out;
+
+	/* We received an ARP from arp->ip_src.
+	 * We might have used this IP address previously (on the bonding host
+	 * itself or on a system that is bridged together with the bond).
+	 * However, if arp->mac_src is different than what is stored in
+	 * rx_hashtbl, some other host is now using the IP and we must prevent
+	 * sending out client updates with this IP address and the old MAC
+	 * address.
+	 * Clean up all hash table entries that have this address as ip_src but
+	 * have a different mac_src.
+	 */
+	rlb_purge_src_ip(bond, arp);
+
+	if (arp->op_code == htons(ARPOP_REPLY)) {
+		/* update rx hash table for this ARP */
+		rlb_update_entry_from_arp(bond, arp);
+		netdev_dbg(bond->dev, "Server received an ARP Reply from client\n");
+	}
+out:
+	return RX_HANDLER_ANOTHER;
+}
+```
+
+
+# bond设备发包处理
 
 ```c
 static netdev_tx_t bond_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -1220,10 +1427,9 @@ static netdev_tx_t __bond_start_xmit(struct sk_buff *skb, struct net_device *dev
 }
 ```
 
-### bond_xmit_roundrobin(ROUNDROBIN)
+## bond_xmit_roundrobin
 
 ```c
-
 static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *bond_dev)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
@@ -1330,7 +1536,7 @@ void bond_dev_queue_xmit(struct bonding *bond, struct sk_buff *skb,
 ```
 
 
-### bond_3ad_xor_xmit(8023AD/XOR)
+### bond_3ad_xor_xmit(LACP)
 
 ```c
 static int bond_3ad_xor_xmit(struct sk_buff *skb, struct net_device *dev)
