@@ -2,53 +2,31 @@
 
 虚拟网卡创建过程涉及到Link操作和网卡驱动相关的初始化过程。
 
-## 虚拟网卡主要数据结构
+调用流程：
 
-网卡驱动：
-```c
-struct net_device_ops {
-	int			(*ndo_init)(struct net_device *dev);
-	void		(*ndo_uninit)(struct net_device *dev);
-	int			(*ndo_open)(struct net_device *dev);
-	int			(*ndo_stop)(struct net_device *dev);
-	netdev_tx_t	(*ndo_start_xmit) (struct sk_buff *skb, struct net_device *dev);
-	u16			(*ndo_select_queue)(struct net_device *dev,
-						    struct sk_buff *skb,
-						    void *accel_priv,
-						    select_queue_fallback_t fallback);
-	void		(*ndo_change_rx_flags)(struct net_device *dev, int flags);
-	//......						     
-}
-```
+![vnic-init-flow](images/vnic-init-flow.png "vnic-init-flow")
 
-Link操作：
-```c
-struct rtnl_link_ops {
-	struct list_head	list;
+虚拟网卡创建调用流程如下：
 
-	const char		*kind;
+* rtnl_newlink（创建入口）
+	1. rtnl_link_ops->validate（根据type找到rtnl_link_ops，校验输入参数）
+	2. m_ops->slave_changelink（修改父设备link信息，根据需要）
+	3. 如果设备已存在，调用do_setlink（修改设备），并返回
+    4. rtnl_group_changelink
+    5. rtnl_create_link（创建net_device设备，实际是虚拟设备对象）
+		1. alloc_netdev_mqs（分配队列）
+			  1. rtnl_link_ops->setup（设备初始化，默认初始化）
+	6. rtnl_link_ops->newlink（创建设备，一般会有如下两个操作）
+		1. register_netdevice（内核注册设备）
+		2. dev->netdev_ops->ndo_init（设备初始化）
+	7. rtnl_configure_link
+		1. __dev_change_flags(dev,flags)
+			1. __dev_open(dev)
+				1. dev->netdev_ops->ndo_validate_addr（设备地址校验）
+				2. dev->netdev_ops->ndo_open（打开设备）
 
-	size_t			priv_size;
-	void			(*setup)(struct net_device *dev);
 
-	int			maxtype;
-	const struct nla_policy	*policy;
-	int			(*validate)(struct nlattr *tb[], struct nlattr *data[]);
-
-	int			(*newlink)(struct net *src_net,
-					   struct net_device *dev,
-					   struct nlattr *tb[],
-					   struct nlattr *data[]);
-	//......						     
-}
-```
-
-网卡收包函数：
-```
-typedef rx_handler_result_t rx_handler_func_t(struct sk_buff **pskb);
-```
-
-## 创建虚拟网卡流程
+# rtnl_newlink(创建入口)
 
 ```c
 static int rtnl_newlink(struct sk_buff *skb, struct nlmsghdr *nlh)
@@ -296,7 +274,12 @@ out_unregister:
 		goto out;
 	}
 }
+```
 
+
+## rtnl_create_link
+
+```c
 struct net_device *rtnl_create_link(struct net *net,
 	const char *ifname, unsigned char name_assign_type,
 	const struct rtnl_link_ops *ops, struct nlattr *tb[])
@@ -351,7 +334,12 @@ struct net_device *rtnl_create_link(struct net *net,
 err:
 	return ERR_PTR(err);
 }
+```
 
+
+### alloc_netdev_mqs
+
+```c
 struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		unsigned char name_assign_type,
 		void (*setup)(struct net_device *),
@@ -452,7 +440,12 @@ free_dev:
 	netdev_freemem(dev);
 	return NULL;
 }
+```
 
+
+## rtnl_configure_link
+
+```c
 int rtnl_configure_link(struct net_device *dev, const struct ifinfomsg *ifm)
 {
 	unsigned int old_flags;
@@ -531,7 +524,12 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags)
 
 	return ret;
 }
+```
 
+
+### __dev_open
+
+```c
 static int __dev_open(struct net_device *dev)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
@@ -575,25 +573,3 @@ static int __dev_open(struct net_device *dev)
 	return ret;
 }
 ```
-
-## 创建虚拟网卡流程总结
-
-虚拟网卡创建过程中，涉及到link接口和驱动接口调用的流程如下：
-
-* rtnl_newlink（创建入口）
-	1. rtnl_link_ops->validate（根据type找到rtnl_link_ops，校验输入参数）
-	2. m_ops->slave_changelink（修改父设备link信息，根据需要）
-	3. 如果设备已存在，调用do_setlink（修改设备），并返回
-    4. rtnl_group_changelink
-    5. rtnl_create_link（创建net_device设备，实际是虚拟设备对象）
-		1. alloc_netdev_mqs（分配队列）
-			  1. rtnl_link_ops->setup（设备初始化，默认初始化）
-	6. rtnl_link_ops->newlink（创建设备，一般会有如下两个操作）
-		1. register_netdevice（内核注册设备）
-		2. dev->netdev_ops->ndo_init（设备初始化）
-	7. rtnl_configure_link
-		1. __dev_change_flags(dev,flags)
-			1. __dev_open(dev)
-				1. dev->netdev_ops->ndo_validate_addr（设备地址校验）
-				2. dev->netdev_ops->ndo_open（打开设备）
-
