@@ -510,7 +510,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     }
 
     if (out_port != ODPP_NONE) {
-        xlate_commit_actions(ctx);
+        xlate_commit_actions(ctx);   //添加修改报文action
 
         if (xr) {
             struct ovs_action_hash *act_hash;
@@ -572,6 +572,74 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     flow->vlan_tci = flow_vlan_tci;
     flow->pkt_mark = flow_pkt_mark;
     flow->nw_tos = flow_nw_tos;
+}
+
+static void
+xlate_commit_actions(struct xlate_ctx *ctx)
+{
+    bool use_masked = ctx->xbridge->support.masked_set_action;
+
+    ctx->xout->slow |= commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
+                                          ctx->odp_actions, ctx->wc,
+                                          use_masked);
+}
+
+enum slow_path_reason
+commit_odp_actions(const struct flow *flow, struct flow *base,
+                   struct ofpbuf *odp_actions, struct flow_wildcards *wc,
+                   bool use_masked)
+{
+    enum slow_path_reason slow1, slow2;
+
+    commit_set_ether_addr_action(flow, base, odp_actions, wc, use_masked);
+    slow1 = commit_set_nw_action(flow, base, odp_actions, wc, use_masked);
+    commit_set_port_action(flow, base, odp_actions, wc, use_masked);
+    slow2 = commit_set_icmp_action(flow, base, odp_actions, wc);
+    commit_mpls_action(flow, base, odp_actions);
+    commit_vlan_action(flow->vlan_tci, base, odp_actions, wc);
+    commit_set_priority_action(flow, base, odp_actions, wc, use_masked);
+    commit_set_pkt_mark_action(flow, base, odp_actions, wc, use_masked);
+
+    return slow1 ? slow1 : slow2;
+}
+
+static void
+commit_set_ether_addr_action(const struct flow *flow, struct flow *base_flow,
+                             struct ofpbuf *odp_actions,
+                             struct flow_wildcards *wc,
+                             bool use_masked)
+{
+    struct ovs_key_ethernet key, base, mask;
+
+    get_ethernet_key(flow, &key);
+    get_ethernet_key(base_flow, &base);
+    get_ethernet_key(&wc->masks, &mask);
+
+    if (commit(OVS_KEY_ATTR_ETHERNET, use_masked,
+               &key, &base, &mask, sizeof key, odp_actions)) {
+        put_ethernet_key(&base, base_flow);
+        put_ethernet_key(&mask, &wc->masks);
+    }
+}
+
+static void
+commit_vlan_action(ovs_be16 vlan_tci, struct flow *base,
+                   struct ofpbuf *odp_actions, struct flow_wildcards *wc)
+{
+    if (base->vlan_tci == vlan_tci) {
+        return;
+    }
+
+    pop_vlan(base, odp_actions, wc);
+    if (vlan_tci & htons(VLAN_CFI)) {
+        struct ovs_action_push_vlan vlan;
+
+        vlan.vlan_tpid = htons(ETH_TYPE_VLAN);
+        vlan.vlan_tci = vlan_tci;
+        nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_PUSH_VLAN,
+                          &vlan, sizeof vlan);
+    }
+    base->vlan_tci = vlan_tci;
 }
 ```
 
